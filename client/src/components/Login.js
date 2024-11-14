@@ -30,7 +30,7 @@ const Login = () => {
       });
 
       const response = await axios.post('http://localhost:5000/api/users/login', {
-        email: formData.email,
+        email: formData.email.toLowerCase(),
         password: formData.password,
         role: formData.role
       });
@@ -70,24 +70,10 @@ const Login = () => {
       }
     } catch (error) {
       console.error('Erreur de connexion:', error);
-      if (error.response) {
-        // Erreur avec réponse du serveur
-        switch (error.response.status) {
-          case 401:
-            setError('Email, mot de passe ou rôle incorrect');
-            break;
-          case 404:
-            setError('Compte non trouvé. Voulez-vous créer un compte ?');
-            break;
-          default:
-            setError(error.response.data.message || 'Erreur lors de la connexion');
-        }
-      } else if (error.request) {
-        // Erreur sans réponse du serveur
-        setError('Impossible de contacter le serveur. Veuillez réessayer plus tard.');
+      if (error.response?.status === 401) {
+        setError('Email, mot de passe ou rôle incorrect. Note : le mot de passe est sensible à la casse.');
       } else {
-        // Autre type d'erreur
-        setError('Une erreur est survenue. Veuillez réessayer.');
+        setError(error.response?.data?.message || 'Une erreur est survenue lors de la connexion');
       }
     } finally {
       setLoading(false);
