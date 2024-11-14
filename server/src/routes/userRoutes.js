@@ -1,19 +1,179 @@
 import express from 'express';
 import User from '../models/User.js';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
 // Route pour créer un utilisateur
 router.post('/register', async (req, res) => {
   try {
-    const user = new User(req.body);
+    console.log('=== Début de l\'inscription ===');
+    console.log('Données reçues:', req.body);
+
+    const { role, email, password, firstName, lastName } = req.body;
+
+    // Vérification des champs requis
+    if (!role || !email || !password || !firstName || !lastName) {
+      console.log('Champs manquants:', { role, email, firstName, lastName });
+      return res.status(400).json({ message: 'Tous les champs sont requis' });
+    }
+
+    // Vérifier si l'utilisateur existe déjà
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      console.log('Email déjà utilisé:', email);
+      return res.status(400).json({ message: 'Cet email est déjà utilisé' });
+    }
+
+    // Hasher le mot de passe
+    console.log('Hashage du mot de passe...');
+    const hashedPassword = await bcrypt.hash(password, 10);
+    console.log('Mot de passe hashé avec succès');
+
+    // Créer le nouvel utilisateur
+    const user = new User({
+      role,
+      email,
+      password: hashedPassword,
+      firstName,
+      lastName,
+      ...(role === 'student' && { studentFields: { level: '' } }),
+      ...(role === 'parent' && { parentFields: { children: [] } })
+    });
+
+    console.log('Tentative de sauvegarde de l\'utilisateur...');
     await user.save();
-    res.status(201).json(user);
+    console.log('Utilisateur sauvegardé avec succès:', user._id);
+
+    // Créer le token JWT
+    console.log('Création du token JWT...');
+    const token = jwt.sign(
+      { 
+        userId: user._id, 
+        role: user.role,
+        email: user.email
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN }
+    );
+    console.log('Token JWT créé avec succès');
+
+    // Envoyer la réponse
+    res.status(201).json({
+      message: 'Compte créé avec succès',
+      user: {
+        id: user._id,
+        email: user.email,
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName
+      },
+      token
+    });
+
+    console.log('=== Inscription terminée avec succès ===');
+
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('=== Erreur lors de l\'inscription ===');
+    console.error('Type d\'erreur:', error.name);
+    console.error('Message d\'erreur:', error.message);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ 
+      message: 'Erreur lors de la création du compte',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
-// Autres routes pour gérer les utilisateurs...
+// Route pour la connexion
+router.post('/login', async (req, res) => {
+  try {
+    console.log('Tentative de connexion:', req.body); // Log pour debug
+
+    const { email, password, role } = req.body;
+
+    // Vérifier si l'utilisateur existe
+    const user = await User.findOne({ email, role });
+    console.log('Utilisateur trouvé:', user); // Log pour debug
+
+    if (!user) {
+      return res.status(401).json({ message: 'Email ou rôle incorrect' });
+    }
+
+    // Vérifier le mot de passe
+    try {
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      console.log('Mot de passe valide:', isValidPassword); // Log pour debug
+
+      if (!isValidPassword) {
+        return res.status(401).json({ message: 'Mot de passe incorrect' });
+      }
+
+      // Créer le token JWT
+      const token = jwt.sign(
+        { 
+          userId: user._id, 
+          role: user.role,
+          email: user.email
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN }
+      );
+
+      // Envoyer la réponse
+      res.json({
+        message: 'Connexion réussie',
+        user: {
+          id: user._id,
+          email: user.email,
+          role: user.role,
+          firstName: user.firstName,
+          lastName: user.lastName
+        },
+        token
+      });
+
+    } catch (bcryptError) {
+      console.error('Erreur bcrypt:', bcryptError);
+      return res.status(500).json({ message: 'Erreur lors de la vérification du mot de passe' });
+    }
+
+  } catch (error) {
+    console.error('Erreur lors de la connexion:', error);
+    res.status(500).json({ message: 'Erreur lors de la connexion' });
+  }
+});
+
+// Route pour supprimer un utilisateur (pour les tests)
+router.delete('/delete', async (req, res) => {
+  try {
+    const { email } = req.body;
+    console.log('Tentative de suppression de l\'utilisateur:', email);
+    
+    const result = await User.deleteOne({ email });
+    console.log('Résultat de la suppression:', result);
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    res.json({ message: 'Utilisateur supprimé avec succès' });
+  } catch (error) {
+    console.error('Erreur lors de la suppression:', error);
+    res.status(500).json({ message: 'Erreur lors de la suppression de l\'utilisateur' });
+  }
+});
+
+// Route pour vérifier si un email existe déjà
+router.post('/check-email', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const existingUser = await User.findOne({ email });
+    res.json({ exists: !!existingUser });
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur lors de la vérification de l\'email' });
+  }
+});
 
 export default router; 

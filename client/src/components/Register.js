@@ -1,18 +1,81 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const Register = () => {
-  const [role, setRole] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    role: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    firstName: '',
+    lastName: ''
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const checkEmailExists = async (email) => {
+    try {
+      const response = await axios.post('http://localhost:5000/api/users/check-email', { email });
+      return response.data.exists;
+    } catch (error) {
+      console.error('Erreur lors de la vérification de l\'email:', error);
+      return false;
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: Implémenter la logique d'inscription
-    console.log('Register attempt:', { role, email, password, firstName, lastName });
+    setError('');
+    setLoading(true);
+
+    try {
+      // Vérifier que les mots de passe correspondent
+      if (formData.password !== formData.confirmPassword) {
+        setError('Les mots de passe ne correspondent pas');
+        return;
+      }
+
+      // Vérifier si l'email existe déjà
+      const emailExists = await checkEmailExists(formData.email);
+      if (emailExists) {
+        setError('Cet email est déjà utilisé. Voulez-vous vous connecter ?');
+        return;
+      }
+
+      const response = await axios.post('http://localhost:5000/api/users/register', {
+        role: formData.role,
+        email: formData.email,
+        password: formData.password,
+        firstName: formData.firstName,
+        lastName: formData.lastName
+      });
+
+      // Stocker le token et rediriger
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+
+      // Redirection selon le rôle
+      if (formData.role === 'parent') {
+        navigate('/parent-dashboard');
+      } else if (formData.role === 'student') {
+        navigate('/student-dashboard');
+      }
+    } catch (error) {
+      console.error('Erreur d\'inscription:', error);
+      if (error.response?.status === 400) {
+        setError(error.response.data.message || 'Cet email est déjà utilisé');
+      } else {
+        setError('Une erreur est survenue lors de l\'inscription. Veuillez réessayer.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -29,14 +92,20 @@ const Register = () => {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow-xl rounded-2xl sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
+            {error && (
+              <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                <span className="block sm:inline">{error}</span>
+              </div>
+            )}
             {/* Sélection du rôle */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Je suis...
               </label>
               <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
+                value={formData.role}
+                onChange={(e) => handleChange(e)}
+                name="role"
                 className="mt-1 block w-full pl-3 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-xl"
                 required
               >
@@ -54,8 +123,9 @@ const Register = () => {
               <div className="mt-1">
                 <input
                   type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
+                  value={formData.lastName}
+                  onChange={(e) => handleChange(e)}
+                  name="lastName"
                   required
                   className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                 />
@@ -70,8 +140,9 @@ const Register = () => {
               <div className="mt-1">
                 <input
                   type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
+                  value={formData.firstName}
+                  onChange={(e) => handleChange(e)}
+                  name="firstName"
                   required
                   className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                 />
@@ -86,8 +157,9 @@ const Register = () => {
               <div className="mt-1">
                 <input
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={formData.email}
+                  onChange={(e) => handleChange(e)}
+                  name="email"
                   required
                   className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                 />
@@ -102,8 +174,9 @@ const Register = () => {
               <div className="mt-1">
                 <input
                   type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={formData.password}
+                  onChange={(e) => handleChange(e)}
+                  name="password"
                   required
                   className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                 />
@@ -118,8 +191,9 @@ const Register = () => {
               <div className="mt-1">
                 <input
                   type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  value={formData.confirmPassword}
+                  onChange={(e) => handleChange(e)}
+                  name="confirmPassword"
                   required
                   className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                 />

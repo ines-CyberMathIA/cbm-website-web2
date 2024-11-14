@@ -1,15 +1,97 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const Login = () => {
-  const [role, setRole] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    role: '',
+    email: '',
+    password: ''
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    // Effacer le message d'erreur quand l'utilisateur commence à modifier les champs
+    setError('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: Implémenter la logique de connexion
-    console.log('Login attempt:', { role, email, password });
+    setError('');
+    setLoading(true);
+
+    try {
+      console.log('Tentative de connexion avec:', {
+        email: formData.email,
+        role: formData.role
+      });
+
+      const response = await axios.post('http://localhost:5000/api/users/login', {
+        email: formData.email,
+        password: formData.password,
+        role: formData.role
+      });
+
+      console.log('Réponse du serveur:', response.data);
+
+      if (response.data.token) {
+        // Stocker le token JWT et les infos utilisateur
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+
+        // Message de succès
+        alert('Connexion réussie !');
+
+        // Redirection selon le rôle
+        switch (formData.role) {
+          case 'parent':
+            navigate('/parent-dashboard');
+            break;
+          case 'student':
+            navigate('/student-dashboard');
+            break;
+          case 'teacher':
+            navigate('/teacher-dashboard');
+            break;
+          case 'admin':
+            navigate('/admin-dashboard');
+            break;
+          case 'recruiter':
+            navigate('/recruiter-dashboard');
+            break;
+          default:
+            navigate('/');
+        }
+      } else {
+        setError('Erreur lors de la connexion : token manquant');
+      }
+    } catch (error) {
+      console.error('Erreur de connexion:', error);
+      if (error.response) {
+        // Erreur avec réponse du serveur
+        switch (error.response.status) {
+          case 401:
+            setError('Email, mot de passe ou rôle incorrect');
+            break;
+          case 404:
+            setError('Compte non trouvé. Voulez-vous créer un compte ?');
+            break;
+          default:
+            setError(error.response.data.message || 'Erreur lors de la connexion');
+        }
+      } else if (error.request) {
+        // Erreur sans réponse du serveur
+        setError('Impossible de contacter le serveur. Veuillez réessayer plus tard.');
+      } else {
+        // Autre type d'erreur
+        setError('Une erreur est survenue. Veuillez réessayer.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -26,14 +108,29 @@ const Login = () => {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow-xl rounded-2xl sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
+            {error && (
+              <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                <span className="block sm:inline">{error}</span>
+                {error.includes('créer un compte') && (
+                  <Link 
+                    to="/register" 
+                    className="block mt-2 text-red-700 underline hover:text-red-800"
+                  >
+                    Créer un compte
+                  </Link>
+                )}
+              </div>
+            )}
+            
             {/* Sélection du rôle */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Je suis...
               </label>
               <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
+                name="role"
+                value={formData.role}
+                onChange={handleChange}
                 className="mt-1 block w-full pl-3 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-xl"
                 required
               >
@@ -54,9 +151,11 @@ const Login = () => {
               <div className="mt-1">
                 <input
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
                   required
+                  autoComplete="email"
                   className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
@@ -70,9 +169,11 @@ const Login = () => {
               <div className="mt-1">
                 <input
                   type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
                   required
+                  autoComplete="current-password"
                   className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
@@ -83,6 +184,7 @@ const Login = () => {
               <div className="flex items-center">
                 <input
                   id="remember-me"
+                  name="remember-me"
                   type="checkbox"
                   className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                 />
@@ -92,9 +194,9 @@ const Login = () => {
               </div>
 
               <div className="text-sm">
-                <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500">
+                <Link to="/forgot-password" className="font-medium text-indigo-600 hover:text-indigo-500">
                   Mot de passe oublié ?
-                </a>
+                </Link>
               </div>
             </div>
 
@@ -102,9 +204,20 @@ const Login = () => {
             <div>
               <button
                 type="submit"
+                disabled={loading}
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                Se connecter
+                {loading ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Connexion en cours...
+                  </span>
+                ) : (
+                  'Se connecter'
+                )}
               </button>
             </div>
           </form>

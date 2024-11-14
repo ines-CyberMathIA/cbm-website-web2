@@ -11,31 +11,29 @@ const userSchema = new mongoose.Schema({
     type: String, 
     required: true, 
     unique: true,
-    lowercase: true
+    lowercase: true,
+    trim: true
   },
   password: { 
     type: String, 
-    required: true 
+    required: true,
+    minlength: 6
   },
-  firstName: { type: String, required: true },
-  lastName: { type: String, required: true },
+  firstName: { 
+    type: String, 
+    required: true,
+    trim: true
+  },
+  lastName: { 
+    type: String, 
+    required: true,
+    trim: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
   // Champs spécifiques par rôle
-  adminFields: {
-    twoFactorSecret: String,
-    lastLogin: Date
-  },
-  teacherFields: {
-    subjects: [String],
-    levels: [String],
-    rib: {
-      iban: String,
-      bic: String
-    },
-    availableSlots: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Session'
-    }]
-  },
   parentFields: {
     children: [{
       type: mongoose.Schema.Types.ObjectId,
@@ -48,23 +46,46 @@ const userSchema = new mongoose.Schema({
     parent: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
-    },
-    sessions: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Session'
-    }]
+    }
   }
 }, { 
-  timestamps: true,
-  discriminatorKey: 'role' 
+  timestamps: true 
 });
 
-// Méthode pour hasher le mot de passe
+// Middleware pour hasher le mot de passe avant la sauvegarde
 userSchema.pre('save', async function(next) {
-  if (this.isModified('password')) {
-    this.password = await bcrypt.hash(this.password, 10);
+  try {
+    // Ne hash le mot de passe que s'il a été modifié
+    if (!this.isModified('password')) {
+      return next();
+    }
+
+    // Générer un salt
+    const salt = await bcrypt.genSalt(10);
+    // Hasher le mot de passe avec le salt
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
-export default mongoose.model('User', userSchema); 
+// Méthode pour comparer les mots de passe
+userSchema.methods.comparePassword = async function(candidatePassword) {
+  try {
+    return await bcrypt.compare(candidatePassword, this.password);
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Méthode pour nettoyer l'objet utilisateur avant de l'envoyer au client
+userSchema.methods.toJSON = function() {
+  const user = this.toObject();
+  delete user.password;
+  return user;
+};
+
+const User = mongoose.model('User', userSchema);
+
+export default User; 
