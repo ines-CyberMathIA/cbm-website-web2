@@ -26,16 +26,11 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Cet email est déjà utilisé' });
     }
 
-    // Hasher le mot de passe
-    console.log('Hashage du mot de passe...');
-    const hashedPassword = await bcrypt.hash(password, 10);
-    console.log('Mot de passe hash�� avec succès');
-
-    // Créer le nouvel utilisateur
+    // Créer le nouvel utilisateur (le hachage se fait automatiquement via le middleware)
     const user = new User({
       role,
       email,
-      password: hashedPassword,
+      password, // Le mot de passe sera hashé par le middleware pre('save')
       firstName,
       lastName,
       ...(role === 'student' && { studentFields: { level: '' } }),
@@ -46,13 +41,7 @@ router.post('/register', async (req, res) => {
     await user.save();
     console.log('Utilisateur sauvegardé avec succès:', user._id);
 
-    // Vérification du JWT_SECRET
-    if (!process.env.JWT_SECRET) {
-      console.error('JWT_SECRET non défini');
-      throw new Error('Configuration JWT manquante');
-    }
-
-    // Création du token JWT avec vérification
+    // Création du token JWT
     console.log('Création du token JWT avec secret:', process.env.JWT_SECRET ? 'présent' : 'manquant');
     const token = jwt.sign(
       { 
@@ -86,7 +75,6 @@ router.post('/register', async (req, res) => {
     console.error('Type d\'erreur:', error.name);
     console.error('Message d\'erreur:', error.message);
     console.error('Stack trace:', error.stack);
-    console.error('JWT_SECRET présent:', !!process.env.JWT_SECRET);
     
     res.status(500).json({ 
       message: 'Erreur lors de la création du compte',

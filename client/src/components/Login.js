@@ -13,8 +13,12 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    // Effacer le message d'erreur quand l'utilisateur commence à modifier les champs
+    const { name, value } = e.target;
+    // Conserver la valeur exacte du mot de passe sans transformation
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
     setError('');
   };
 
@@ -24,14 +28,12 @@ const Login = () => {
     setLoading(true);
 
     try {
-      console.log('Tentative de connexion avec:', {
-        email: formData.email,
-        role: formData.role
-      });
+      // Log pour vérifier la valeur exacte avant envoi
+      console.log('Valeur exacte du mot de passe:', formData.password);
 
       const response = await axios.post('http://localhost:5000/api/users/login', {
         email: formData.email.toLowerCase(),
-        password: formData.password,
+        password: formData.password,  // Envoyer le mot de passe tel quel
         role: formData.role
       });
 
@@ -71,7 +73,7 @@ const Login = () => {
     } catch (error) {
       console.error('Erreur de connexion:', error);
       if (error.response?.status === 401) {
-        setError('Email, mot de passe ou rôle incorrect. Note : le mot de passe est sensible à la casse.');
+        setError('Email ou mot de passe incorrect');
       } else {
         setError(error.response?.data?.message || 'Une erreur est survenue lors de la connexion');
       }
@@ -160,9 +162,16 @@ const Login = () => {
                   onChange={handleChange}
                   required
                   autoComplete="current-password"
+                  autoCapitalize="off"  // Désactiver l'auto-capitalisation
+                  autoCorrect="off"     // Désactiver l'auto-correction
+                  spellCheck="false"    // Désactiver la vérification orthographique
                   className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  style={{ textTransform: 'none' }}  // Empêcher toute transformation CSS
                 />
               </div>
+              <p className="mt-1 text-sm text-gray-500">
+                Entrez votre mot de passe exactement comme lors de l'inscription
+              </p>
             </div>
 
             {/* Options de connexion */}
