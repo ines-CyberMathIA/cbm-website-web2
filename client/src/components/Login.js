@@ -28,26 +28,18 @@ const Login = () => {
     setLoading(true);
 
     try {
-      // Log pour vérifier la valeur exacte avant envoi
-      console.log('Valeur exacte du mot de passe:', formData.password);
-
       const response = await axios.post('http://localhost:5000/api/users/login', {
         email: formData.email.toLowerCase(),
-        password: formData.password,  // Envoyer le mot de passe tel quel
+        password: formData.password,
         role: formData.role
       });
 
-      console.log('Réponse du serveur:', response.data);
-
       if (response.data.token) {
-        // Stocker le token JWT et les infos utilisateur
+        // Stocker le token et les infos utilisateur
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
 
-        // Message de succès
-        alert('Connexion réussie !');
-
-        // Redirection selon le rôle
+        // Redirection directe selon le rôle (sans alert)
         switch (formData.role) {
           case 'parent':
             navigate('/parent-dashboard');
