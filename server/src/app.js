@@ -100,6 +100,14 @@ app.use((req, res) => {
   res.status(404).json({ message: 'Route non trouvée' });
 });
 
+// Vérification des variables d'environnement requises
+console.log('=== Vérification des variables d\'environnement ===');
+if (!process.env.JWT_SECRET) {
+  console.error('JWT_SECRET n\'est pas défini !');
+  process.exit(1);
+}
+console.log('JWT_SECRET est défini:', process.env.JWT_SECRET.substring(0, 5) + '...');
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`=== Configuration du Serveur ===`);
@@ -107,6 +115,7 @@ app.listen(PORT, () => {
   console.log('Environnement:', process.env.NODE_ENV);
   console.log('MongoDB URI configurée:', process.env.MONGODB_URI ? 'Oui' : 'Non');
   console.log('JWT Secret configuré:', process.env.JWT_SECRET ? 'Oui' : 'Non');
+  console.log('JWT Secret length:', process.env.JWT_SECRET?.length);
   console.log('============================');
 });
 
