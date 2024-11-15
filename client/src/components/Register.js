@@ -21,7 +21,7 @@ const Register = () => {
 
   const checkEmailExists = async (email) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/users/check-email', { email });
+      const response = await axios.post('http://localhost:5001/api/users/check-email', { email });
       return response.data.exists;
     } catch (error) {
       console.error('Erreur lors de la vérification de l\'email:', error);
@@ -48,7 +48,7 @@ const Register = () => {
         return;
       }
 
-      const response = await axios.post('http://localhost:5000/api/users/register', {
+      const response = await axios.post('http://localhost:5001/api/users/register', {
         role: formData.role,
         email: formData.email,
         password: formData.password,
