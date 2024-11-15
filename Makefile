@@ -13,9 +13,12 @@ RED = \033[0;31m
 NC = \033[0m # No Color
 
 # Commandes principales
-.PHONY: help install start stop dev test deploy clean setup-dev setup-db lint build check-deps install-deps setup-node docker-permissions remove-old-node check-docker-files db-shell db-status
+# ... (garder toutes les variables et cibles existantes)
 
-help:
+# Nouvelles commandes pour l'administration
+.PHONY: admin-setup admin-reset admin-logs admin-test admin-check
+
+help: ## Affiche l'aide avec les nouvelles commandes
 	@echo "${CYAN}=== Commandes disponibles ===${NC}"
 	@echo "${GREEN}make remove-old-node${NC} - Supprime l'ancienne version de Node.js"
 	@echo "${GREEN}make setup-node${NC}    - Configure Node.js (version LTS)"
@@ -29,7 +32,61 @@ help:
 	@echo "${GREEN}make stop${NC}          - Arrête l'application"
 	@echo "${GREEN}make clean${NC}         - Nettoie les fichiers temporaires"
 	@echo "${GREEN}make db-shell${NC}      - Se connecter à MongoDB"
-	@echo "${GREEN}make db-status${NC}      - Voir l'état de la base de données"
+	@echo "${GREEN}make db-status${NC}     - Voir l'état de la base de données"
+	@echo "${YELLOW}=== Commandes Admin ===${NC}"
+	@echo "${GREEN}make admin-setup${NC}   - Configure le compte administrateur"
+	@echo "${GREEN}make admin-reset${NC}   - Réinitialise le compte administrateur"
+	@echo "${GREEN}make admin-logs${NC}    - Affiche les logs du serveur"
+	@echo "${GREEN}make admin-test${NC}    - Teste la configuration admin"
+	@echo "${GREEN}make admin-check${NC}   - Vérifie l'état des services admin"
+
+admin-setup: ## Configure le compte administrateur et l'authentification double facteur
+	@echo "${CYAN}Configuration du compte administrateur...${NC}"
+	@$(DOCKER_COMPOSE) down
+	@$(DOCKER_COMPOSE) up -d mongodb
+	@sleep 5
+	@cd server && $(NPM) run create-admin
+	@$(DOCKER_COMPOSE) up -d
+	@echo "${GREEN}Compte administrateur configuré !${NC}"
+	@echo "${YELLOW}=== Identifiants Admin ===${NC}"
+	@echo "URL      : http://localhost:3000/admin-login"
+	@echo "Login    : admin_cybermathia"
+	@echo "Password : Admin123!@#"
+	@echo "${YELLOW}=== Configuration Email ===${NC}"
+	@echo "Email    : cybermathia@gmail.com"
+	@echo "App Pass : wuig znrg uggv tydt"
+
+admin-reset: ## Réinitialise le compte administrateur
+	@echo "${CYAN}Réinitialisation du compte administrateur...${NC}"
+	@$(DOCKER_COMPOSE) down
+	@$(DOCKER_COMPOSE) up -d mongodb
+	@sleep 5
+	@cd server && $(NPM) run reset-admin
+	@$(DOCKER_COMPOSE) up -d
+	@echo "${GREEN}Compte administrateur réinitialisé !${NC}"
+
+admin-logs: ## Affiche les logs du serveur pour le debugging admin
+	@echo "${CYAN}Affichage des logs du serveur...${NC}"
+	@$(DOCKER_COMPOSE) logs -f server
+
+admin-test: ## Teste la connexion admin et l'envoi d'emails
+	@echo "${CYAN}Test de la configuration admin...${NC}"
+	@echo "1. Vérification de la base de données..."
+	@$(DOCKER_COMPOSE) exec mongodb mongosh -u admin -p password --eval "use tutoring; db.users.findOne({role:'admin'})"
+	@echo "2. Vérification du serveur SMTP..."
+	@cd server && node -e "require('nodemailer').createTransport({service:'gmail',auth:{user:process.env.EMAIL_USER,pass:process.env.EMAIL_PASSWORD}}).verify().then(() => console.log('${GREEN}Configuration email OK${NC}')).catch(err => console.error('${RED}Erreur email:', err, '${NC}'))"
+
+admin-check: ## Vérifie l'état des services admin
+	@echo "${CYAN}Vérification des services admin...${NC}"
+	@echo "1. État des conteneurs :"
+	@$(DOCKER_COMPOSE) ps
+	@echo "\n2. État de la base de données :"
+	@$(DOCKER_COMPOSE) exec mongodb mongosh -u admin -p password --eval "db.adminCommand('ping')"
+	@echo "\n3. Vérification des variables d'environnement :"
+	@cd server && node -e "console.log('EMAIL_USER:', process.env.EMAIL_USER); console.log('JWT_SECRET:', process.env.JWT_SECRET?.substring(0,10) + '...')"
+
+
+
 
 remove-old-node:
 	@echo "${CYAN}Suppression de l'ancienne version de Node.js...${NC}"
