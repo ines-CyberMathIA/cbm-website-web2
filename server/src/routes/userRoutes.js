@@ -157,4 +157,65 @@ router.post('/complete-manager-registration', async (req, res) => {
   }
 });
 
+// Vérification du token professeur
+router.post('/verify-teacher-token', async (req, res) => {
+  try {
+    const { token } = req.body;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    res.json({
+      firstName: decoded.firstName,
+      lastName: decoded.lastName,
+      email: decoded.email,
+      speciality: decoded.speciality,
+      level: decoded.level
+    });
+  } catch (error) {
+    res.status(401).json({ message: 'Token invalide ou expiré' });
+  }
+});
+
+// Finalisation de l'inscription professeur
+router.post('/complete-teacher-registration', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Créer le compte professeur
+    const teacher = new User({
+      firstName: decoded.firstName,
+      lastName: decoded.lastName,
+      email: decoded.email,
+      password: password,
+      role: 'teacher',
+      speciality: decoded.speciality,
+      level: decoded.level
+    });
+
+    await teacher.save();
+
+    // Générer le token de connexion
+    const authToken = jwt.sign(
+      { userId: teacher._id, role: 'teacher' },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN }
+    );
+
+    res.json({
+      token: authToken,
+      user: {
+        id: teacher._id,
+        firstName: teacher.firstName,
+        lastName: teacher.lastName,
+        email: teacher.email,
+        role: teacher.role,
+        speciality: teacher.speciality,
+        level: teacher.level
+      }
+    });
+  } catch (error) {
+    console.error('Erreur lors de la création du compte professeur:', error);
+    res.status(400).json({ message: 'Erreur lors de la création du compte' });
+  }
+});
+
 export default router; 

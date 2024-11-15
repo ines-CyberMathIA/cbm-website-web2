@@ -17,14 +17,22 @@ const userSchema = new mongoose.Schema({
     lowercase: true
   },
   password: {
-    type: String,
-    required: true
+    type: String
   },
   role: {
     type: String,
     enum: ['admin', 'teacher', 'parent', 'student', 'manager'],
     required: true
   },
+  speciality: {
+    type: String,
+    enum: ['mathematics', 'physics', 'chemistry', 'biology', 'computer_science'],
+    required: function() { return this.role === 'teacher'; }
+  },
+  level: [{
+    type: String,
+    enum: ['college', 'lycee', 'superieur', 'adulte']
+  }],
   createdAt: {
     type: Date,
     default: Date.now

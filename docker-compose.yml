@@ -28,6 +28,8 @@ services:
       - JWT_SECRET=cybermathia_secret_key_2024
       - JWT_EXPIRES_IN=24h
       - PORT=5001
+      - EMAIL_USER=cybermathia@gmail.com
+      - EMAIL_PASSWORD=wuig znrg uggv tydt
     depends_on:
       - mongodb
     networks:
