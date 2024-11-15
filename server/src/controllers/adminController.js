@@ -25,12 +25,18 @@ const adminController = {
 
       // Vérifier le login
       if (login !== 'admin_cybermathia') {
-        console.log('Login incorrect');
+        console.log('Login incorrect:', login);
         return res.status(401).json({ message: 'Identifiants incorrects' });
       }
 
       // Vérifier si l'utilisateur admin existe
       const admin = await User.findOne({ email: 'admin@cybermathia.com', role: 'admin' });
+      console.log('Admin trouvé:', admin ? {
+        email: admin.email,
+        role: admin.role,
+        passwordHash: admin.password.substring(0, 10) + '...'
+      } : 'Non');
+      
       if (!admin) {
         console.log('Admin non trouvé dans la base de données');
         return res.status(401).json({ message: 'Compte administrateur non trouvé' });
@@ -38,6 +44,10 @@ const adminController = {
 
       // Vérifier le mot de passe
       const isValidPassword = await bcrypt.compare(password, admin.password);
+      console.log('Mot de passe fourni:', password);
+      console.log('Hash stocké:', admin.password);
+      console.log('Mot de passe valide:', isValidPassword);
+      
       if (!isValidPassword) {
         console.log('Mot de passe incorrect');
         return res.status(401).json({ message: 'Identifiants incorrects' });

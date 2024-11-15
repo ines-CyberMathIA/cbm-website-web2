@@ -46,7 +46,17 @@ userSchema.pre('save', async function(next) {
 
 // Méthode pour comparer les mots de passe
 userSchema.methods.comparePassword = async function(candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
+  try {
+    console.log('Comparaison des mots de passe:');
+    console.log('- Mot de passe stocké (hash):', this.password);
+    console.log('- Mot de passe candidat:', candidatePassword);
+    const isMatch = await bcrypt.compare(candidatePassword, this.password);
+    console.log('- Résultat de la comparaison:', isMatch);
+    return isMatch;
+  } catch (error) {
+    console.error('Erreur lors de la comparaison des mots de passe:', error);
+    throw error;
+  }
 };
 
 const User = mongoose.model('User', userSchema);
