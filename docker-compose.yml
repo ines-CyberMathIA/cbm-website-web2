@@ -32,6 +32,7 @@ services:
       - mongodb
     networks:
       - app-network
+    command: npm run dev
 
   client:
     build:
@@ -53,6 +54,7 @@ services:
       - server
     networks:
       - app-network
+    command: npm start
 
 networks:
   app-network:

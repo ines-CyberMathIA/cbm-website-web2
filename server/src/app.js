@@ -4,14 +4,23 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import userRoutes from './routes/userRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 dotenv.config();
 
 const app = express();
 
-// Middleware avec logs détaillés
-app.use(cors());
+// Configuration CORS détaillée
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
 app.use(express.json());
+
+// Middleware avec logs détaillés
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   if (req.body) {
@@ -58,6 +67,8 @@ app.use('/api/users', (req, res, next) => {
   console.log('API Users Route:', req.method, req.url);
   next();
 }, userRoutes);
+
+app.use('/api/admin', adminRoutes);
 
 // Route de test
 app.get('/api/health', (req, res) => {

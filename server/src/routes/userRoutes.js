@@ -1,195 +1,104 @@
 import express from 'express';
-import User from '../models/User.js';
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import User from '../models/User.js';
+import authMiddleware from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Route pour créer un utilisateur
+// Route d'inscription
 router.post('/register', async (req, res) => {
   try {
-    console.log('=== Début de l\'inscription ===');
-    console.log('Données reçues:', req.body);
-
-    const { role, email, password, firstName, lastName } = req.body;
-
-    // Vérification des champs requis
-    if (!role || !email || !password || !firstName || !lastName) {
-      console.log('Champs manquants:', { role, email, firstName, lastName });
-      return res.status(400).json({ message: 'Tous les champs sont requis' });
-    }
-
+    const { firstName, lastName, email, password, role } = req.body;
+    
     // Vérifier si l'utilisateur existe déjà
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      console.log('Email déjà utilisé:', email);
       return res.status(400).json({ message: 'Cet email est déjà utilisé' });
     }
 
-    // Créer le nouvel utilisateur (le hachage se fait automatiquement via le middleware)
+    // Créer le nouvel utilisateur
     const user = new User({
-      role,
-      email,
-      password, // Le mot de passe sera hashé par le middleware pre('save')
       firstName,
       lastName,
-      ...(role === 'student' && { studentFields: { level: '' } }),
-      ...(role === 'parent' && { parentFields: { children: [] } })
+      email,
+      password,
+      role
     });
 
-    console.log('Tentative de sauvegarde de l\'utilisateur...');
     await user.save();
-    console.log('Utilisateur sauvegardé avec succès:', user._id);
 
-    // Création du token JWT
-    console.log('Création du token JWT avec secret:', process.env.JWT_SECRET ? 'présent' : 'manquant');
+    // Générer le token
     const token = jwt.sign(
-      { 
-        userId: user._id, 
-        role: user.role,
-        email: user.email
-      },
+      { userId: user._id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+      { expiresIn: process.env.JWT_EXPIRES_IN }
     );
 
-    console.log('Token JWT créé avec succès');
-
-    // Envoyer la réponse
     res.status(201).json({
-      message: 'Compte créé avec succès',
+      token,
       user: {
         id: user._id,
-        email: user.email,
-        role: user.role,
         firstName: user.firstName,
-        lastName: user.lastName
-      },
-      token
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role
+      }
     });
-
-    console.log('=== Inscription terminée avec succès ===');
-
   } catch (error) {
-    console.error('=== Erreur lors de l\'inscription ===');
-    console.error('Type d\'erreur:', error.name);
-    console.error('Message d\'erreur:', error.message);
-    console.error('Stack trace:', error.stack);
-    
-    res.status(500).json({ 
-      message: 'Erreur lors de la création du compte',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    console.error('Erreur d\'inscription:', error);
+    res.status(500).json({ message: 'Erreur lors de l\'inscription' });
   }
 });
 
-// Route pour la connexion
+// Route de connexion
 router.post('/login', async (req, res) => {
   try {
-    console.log('=== Tentative de connexion ===');
-    console.log('Données reçues:', req.body);
-
     const { email, password, role } = req.body;
 
-    // Vérification des champs requis
-    if (!email || !password || !role) {
-      console.log('Champs manquants:', { email: !!email, password: !!password, role: !!role });
-      return res.status(400).json({ message: 'Tous les champs sont requis' });
-    }
-
-    // Recherche de l'utilisateur
+    // Trouver l'utilisateur
     const user = await User.findOne({ email, role });
-    console.log('Utilisateur trouvé:', user ? 'Oui' : 'Non');
-
     if (!user) {
-      console.log('Utilisateur non trouvé avec email:', email, 'et rôle:', role);
-      return res.status(401).json({ 
-        message: 'Email ou rôle incorrect',
-        details: 'Aucun utilisateur trouvé avec ces identifiants'
-      });
+      return res.status(401).json({ message: 'Email ou mot de passe incorrect' });
     }
 
-    // Vérification du mot de passe
-    console.log('Vérification du mot de passe...');
+    // Vérifier le mot de passe
     const isValidPassword = await user.comparePassword(password);
-    console.log('Mot de passe valide:', isValidPassword);
-
     if (!isValidPassword) {
-      console.log('Mot de passe invalide pour l\'utilisateur:', email);
-      return res.status(401).json({ 
-        message: 'Mot de passe incorrect',
-        details: 'Le mot de passe fourni ne correspond pas'
-      });
+      return res.status(401).json({ message: 'Email ou mot de passe incorrect' });
     }
 
-    // Création du token JWT
-    console.log('Création du token JWT...');
+    // Générer le token
     const token = jwt.sign(
-      { 
-        userId: user._id, 
-        role: user.role,
-        email: user.email
-      },
+      { userId: user._id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+      { expiresIn: process.env.JWT_EXPIRES_IN }
     );
 
-    console.log('Token JWT créé avec succès');
-
-    // Envoi de la réponse
     res.json({
-      message: 'Connexion réussie',
+      token,
       user: {
         id: user._id,
-        email: user.email,
-        role: user.role,
         firstName: user.firstName,
-        lastName: user.lastName
-      },
-      token
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role
+      }
     });
-
-    console.log('=== Connexion réussie ===');
-
   } catch (error) {
-    console.error('=== Erreur lors de la connexion ===');
-    console.error('Type d\'erreur:', error.name);
-    console.error('Message d\'erreur:', error.message);
-    console.error('Stack trace:', error.stack);
-    res.status(500).json({ 
-      message: 'Erreur lors de la connexion',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    console.error('Erreur de connexion:', error);
+    res.status(500).json({ message: 'Erreur lors de la connexion' });
   }
 });
 
-// Route pour supprimer un utilisateur (pour les tests)
-router.delete('/delete', async (req, res) => {
-  try {
-    const { email } = req.body;
-    console.log('Tentative de suppression de l\'utilisateur:', email);
-    
-    const result = await User.deleteOne({ email });
-    console.log('Résultat de la suppression:', result);
-
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ message: 'Utilisateur non trouvé' });
-    }
-
-    res.json({ message: 'Utilisateur supprimé avec succès' });
-  } catch (error) {
-    console.error('Erreur lors de la suppression:', error);
-    res.status(500).json({ message: 'Erreur lors de la suppression de l\'utilisateur' });
-  }
-});
-
-// Route pour vérifier si un email existe déjà
+// Route de vérification d'email
 router.post('/check-email', async (req, res) => {
   try {
     const { email } = req.body;
-    const existingUser = await User.findOne({ email });
-    res.json({ exists: !!existingUser });
+    const exists = await User.exists({ email });
+    res.json({ exists: !!exists });
   } catch (error) {
+    console.error('Erreur de vérification d\'email:', error);
     res.status(500).json({ message: 'Erreur lors de la vérification de l\'email' });
   }
 });
