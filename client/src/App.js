@@ -5,6 +5,7 @@ import Register from './components/Register';
 import ParentDashboard from './components/ParentDashboard';
 import AdminLogin from './components/AdminLogin';
 import AdminDashboard from './components/AdminDashboard';
+import CompleteManagerRegistration from './components/CompleteManagerRegistration';
 
 const Home = () => {
   return (
@@ -107,6 +108,7 @@ function App() {
         <Route path="/parent-dashboard" element={<ParentDashboard />} />
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        <Route path="/complete-registration" element={<CompleteManagerRegistration />} />
       </Routes>
     </Router>
   );
