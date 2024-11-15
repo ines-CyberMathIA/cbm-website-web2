@@ -9,12 +9,20 @@ const AdminDashboard = () => {
     totalUsers: 0,
     totalTeachers: 0,
     totalStudents: 0,
-    totalParents: 0
+    totalParents: 0,
+    totalManagers: 0
   });
   const [usersList, setUsersList] = useState([]);
   const [activeSection, setActiveSection] = useState('overview');
   const [selectedRole, setSelectedRole] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showManagerModal, setShowManagerModal] = useState(false);
+  const [formState, setFormState] = useState({
+    firstName: '',
+    lastName: '',
+    email: ''
+  });
+  const [modalError, setModalError] = useState('');
 
   // Vérification de l'authentification admin
   useEffect(() => {
@@ -23,20 +31,21 @@ const AdminDashboard = () => {
     }
   }, [navigate, user]);
 
-  // Charger les statistiques
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get('http://localhost:5001/api/admin/stats', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setStats(response.data);
-      } catch (error) {
-        console.error('Erreur lors du chargement des statistiques:', error);
-      }
-    };
+  // Fonction pour récupérer les statistiques
+  const fetchStats = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('http://localhost:5001/api/admin/stats', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setStats(response.data);
+    } catch (error) {
+      console.error('Erreur lors du chargement des statistiques:', error);
+    }
+  };
 
+  // Charger les statistiques au montage du composant
+  useEffect(() => {
     fetchStats();
   }, []);
 
@@ -95,15 +104,143 @@ const AdminDashboard = () => {
     );
   };
 
+  // Gestionnaire d'événements simplifié
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormState((prev) => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Soumission du formulaire
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setModalError('');
+    setLoading(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        'http://localhost:5001/api/admin/create-manager',
+        formState,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      // Rafraîchir les statistiques et la liste
+      await fetchStats();
+      if (selectedRole === 'manager') {
+        await fetchUsersByRole('manager');
+      }
+
+      // Réinitialiser et fermer
+      setFormState({
+        firstName: '',
+        lastName: '',
+        email: ''
+      });
+      setShowManagerModal(false);
+      alert('Un email a été envoyé au manager pour finaliser la création de son compte');
+    } catch (error) {
+      setModalError(error.response?.data?.message || 'Erreur lors de la création du manager');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Modal simplifié
+  const ManagerModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-8 border w-96 shadow-2xl rounded-2xl bg-white">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-semibold text-gray-900">Inviter un nouveau manager</h3>
+          <button
+            onClick={() => setShowManagerModal(false)}
+            className="text-gray-400 hover:text-gray-500 transition-colors"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {modalError && (
+          <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4 rounded">
+            <p className="text-red-700">{modalError}</p>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
+              <input
+                type="text"
+                name="firstName"
+                value={formState.firstName}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+              <input
+                type="text"
+                name="lastName"
+                value={formState.lastName}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                name="email"
+                value={formState.email}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={() => setShowManagerModal(false)}
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {loading ? 'Envoi...' : 'Inviter'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-50">
       {/* Navbar */}
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
-                <span className="text-2xl font-bold text-red-600">Admin CyberMathIA</span>
+                <span className="text-2xl font-bold text-emerald-600">Admin CyberMathIA</span>
               </div>
             </div>
             <div className="flex items-center">
@@ -137,13 +274,22 @@ const AdminDashboard = () => {
             >
               Vue d'ensemble
             </button>
+            <button
+              onClick={() => setShowManagerModal(true)}
+              className="mt-2 group flex items-center px-2 py-2 text-base font-medium rounded-md w-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+            >
+              <svg className="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+              </svg>
+              Créer un manager
+            </button>
           </nav>
         </div>
 
         {/* Contenu principal */}
         <div className="flex-1 p-8">
           {/* Statistiques générales */}
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
             {/* Total Utilisateurs */}
             <div 
               className="bg-white overflow-hidden shadow rounded-lg cursor-pointer hover:shadow-md transition-shadow"
@@ -247,12 +393,41 @@ const AdminDashboard = () => {
                 </div>
               </div>
             </div>
+
+            {/* Managers */}
+            <div 
+              className="bg-white overflow-hidden shadow rounded-lg cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => fetchUsersByRole('manager')}
+            >
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">
+                        Managers
+                      </dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {stats.totalManagers}
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Liste des utilisateurs */}
           {activeSection === 'users' && <UsersList />}
         </div>
       </div>
+
+      {/* Modal de création de manager */}
+      {showManagerModal && <ManagerModal />}
     </div>
   );
 };

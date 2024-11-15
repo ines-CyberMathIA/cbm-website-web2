@@ -71,8 +71,8 @@ const Register = () => {
         case 'admin':
           navigate('/admin-dashboard');
           break;
-        case 'recruiter':
-          navigate('/recruiter-dashboard');
+        case 'manager':
+          navigate('/manager-dashboard');
           break;
         default:
           navigate('/');
@@ -94,9 +94,9 @@ const Register = () => {
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
           Créer votre compte
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Pour les professeurs et recruteurs, veuillez nous contacter directement
-        </p>
+        <div className="mt-2 text-center text-sm text-gray-600">
+          Pour les professeurs et managers, veuillez nous contacter directement
+        </div>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -254,7 +254,7 @@ const Register = () => {
                 href="mailto:contact@cybermathia.fr"
                 className="text-indigo-600 hover:text-indigo-500"
               >
-                Contactez-nous pour rejoindre l'équipe
+                Contactez-nous pour rejoindre l'équipe en tant que professeur ou manager
               </a>
             </div>
           </div>

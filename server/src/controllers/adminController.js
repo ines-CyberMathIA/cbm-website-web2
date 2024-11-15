@@ -200,7 +200,8 @@ const adminController = {
         totalUsers: await User.countDocuments(),
         totalTeachers: await User.countDocuments({ role: 'teacher' }),
         totalStudents: await User.countDocuments({ role: 'student' }),
-        totalParents: await User.countDocuments({ role: 'parent' })
+        totalParents: await User.countDocuments({ role: 'parent' }),
+        totalManagers: await User.countDocuments({ role: 'manager' })
       };
       res.json(stats);
     } catch (error) {
@@ -238,6 +239,61 @@ const adminController = {
     } catch (error) {
       console.error('Erreur lors de la récupération des utilisateurs:', error);
       res.status(500).json({ message: 'Erreur lors de la récupération des utilisateurs' });
+    }
+  },
+
+  // Ajouter cette méthode au contrôleur admin
+  createManager: async (req, res) => {
+    try {
+      const { firstName, lastName, email } = req.body;
+
+      // Vérifier si l'email existe déjà
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({ message: 'Cet email est déjà utilisé' });
+      }
+
+      // Générer un token d'invitation unique
+      const inviteToken = jwt.sign(
+        { email, role: 'manager', firstName, lastName },
+        process.env.JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+
+      // Envoyer l'email d'invitation
+      const inviteUrl = `http://localhost:3000/complete-registration?token=${inviteToken}`;
+      
+      await transporter.sendMail({
+        from: 'CyberMathIA <cybermathia@gmail.com>',
+        to: email,
+        subject: 'Invitation à rejoindre CyberMathIA en tant que Manager',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #059669;">Bienvenue chez CyberMathIA !</h1>
+            <p>Bonjour ${firstName},</p>
+            <p>Vous avez été invité(e) à rejoindre l'équipe CyberMathIA en tant que Manager.</p>
+            <p>Pour finaliser la création de votre compte, veuillez cliquer sur le lien ci-dessous :</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${inviteUrl}" style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Finaliser mon inscription
+              </a>
+            </div>
+            <p style="color: #666;">Ce lien expire dans 24 heures.</p>
+            <hr style="margin: 30px 0;">
+            <p style="color: #666; font-size: 12px;">
+              Si vous n'attendiez pas cette invitation, vous pouvez ignorer cet email.
+            </p>
+          </div>
+        `
+      });
+
+      res.status(200).json({
+        message: 'Invitation envoyée avec succès',
+        email
+      });
+    } catch (error) {
+      console.error('Erreur lors de la création du manager:', error);
+      res.status(500).json({ message: 'Erreur lors de l\'envoi de l\'invitation' });
     }
   }
 };

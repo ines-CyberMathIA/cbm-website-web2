@@ -50,11 +50,11 @@ const Login = () => {
           case 'teacher':
             navigate('/teacher-dashboard');
             break;
+          case 'manager':
+            navigate('/manager-dashboard');
+            break;
           case 'admin':
             navigate('/admin-dashboard');
-            break;
-          case 'recruiter':
-            navigate('/recruiter-dashboard');
             break;
           default:
             navigate('/');
@@ -119,7 +119,7 @@ const Login = () => {
                 <option value="parent">Parent</option>
                 <option value="teacher">Professeur</option>
                 <option value="admin">Administrateur</option>
-                <option value="recruiter">Recruteur</option>
+                <option value="manager">Manager</option>
               </select>
             </div>
 
