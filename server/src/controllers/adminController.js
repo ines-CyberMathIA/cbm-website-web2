@@ -4,14 +4,41 @@ import nodemailer from 'nodemailer';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
-// Configuration du transporteur email
+// Configuration du transporteur email avec les nouveaux identifiants
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
+    user: 'cybermathia@gmail.com',  // Email configuré
+    pass: 'wuig znrg uggv tydt'     // Mot de passe d'application généré
   }
 });
+
+// Fonction pour envoyer le code 2FA
+const send2FACode = async (code) => {
+  try {
+    await transporter.sendMail({
+      from: 'CyberMathIA Admin <cybermathia@gmail.com>',
+      to: 'admin@cybermathia.com',
+      subject: 'Code de vérification CyberMathIA',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #4F46E5;">Code de vérification administrateur</h1>
+          <p style="font-size: 18px;">Votre code de vérification est : <strong style="color: #4F46E5; font-size: 24px;">${code}</strong></p>
+          <p>Ce code expire dans 5 minutes.</p>
+          <p style="color: #EF4444;">Si vous n'avez pas demandé ce code, veuillez sécuriser votre compte immédiatement.</p>
+          <hr>
+          <p style="color: #6B7280; font-size: 12px;">CyberMathIA - Administration</p>
+        </div>
+      `
+    });
+    console.log('Email 2FA envoyé avec succès à admin@cybermathia.com');
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi de l\'email:', error);
+    console.error('Détails:', error.message);
+    return false;
+  }
+};
 
 // Stockage temporaire des codes 2FA (en production, utiliser Redis)
 const twoFactorCodes = new Map();
@@ -66,23 +93,16 @@ const adminController = {
       // Pour le développement, afficher le code dans la console
       console.log('Code 2FA pour test:', twoFactorCode);
 
-      // Envoyer le code par email (désactivé pour le développement)
-      /*await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: 'admin@cybermathia.com',
-        subject: 'Code de vérification CyberMathIA',
-        html: `
-          <h1>Code de vérification administrateur</h1>
-          <p>Votre code de vérification est : <strong>${twoFactorCode}</strong></p>
-          <p>Ce code expire dans 5 minutes.</p>
-          <p>Si vous n'avez pas demandé ce code, veuillez sécuriser votre compte immédiatement.</p>
-        `
-      });*/
+      // Envoyer le code par email
+      const emailSent = await send2FACode(twoFactorCode);
+      if (!emailSent) {
+        return res.status(500).json({ message: 'Erreur lors de l\'envoi du code de vérification' });
+      }
 
       res.json({ 
         message: 'Code de vérification envoyé', 
         requireTwoFactor: true,
-        // Pour le développement uniquement
+        // En développement uniquement, on envoie aussi le code dans la réponse
         testCode: process.env.NODE_ENV === 'development' ? twoFactorCode : undefined
       });
     } catch (error) {
