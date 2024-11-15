@@ -13,8 +13,6 @@ router.post('/verify-2fa', adminController.verifyTwoFactor);
 router.get('/stats', authMiddleware, adminMiddleware, adminController.getStats);
 router.get('/connections', authMiddleware, adminMiddleware, adminController.getConnections);
 router.get('/users/:role', authMiddleware, adminMiddleware, adminController.getUsersByRole);
-
-// Ajouter cette route
 router.post('/create-manager', authMiddleware, adminMiddleware, adminController.createManager);
 
 export default router; 
