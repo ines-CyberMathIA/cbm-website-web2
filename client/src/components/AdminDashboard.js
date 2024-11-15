@@ -11,12 +11,14 @@ const AdminDashboard = () => {
     totalStudents: 0,
     totalParents: 0
   });
-  const [recentConnections, setRecentConnections] = useState([]);
+  const [usersList, setUsersList] = useState([]);
   const [activeSection, setActiveSection] = useState('overview');
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   // Vérification de l'authentification admin
   useEffect(() => {
-    if (!user || user.role !== 'admin' || user.email !== 'admin@cybermathia.com') {
+    if (!user || user.role !== 'admin') {
       navigate('/admin-login');
     }
   }, [navigate, user]);
@@ -26,7 +28,7 @@ const AdminDashboard = () => {
     const fetchStats = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get('http://localhost:5000/api/admin/stats', {
+        const response = await axios.get('http://localhost:5001/api/admin/stats', {
           headers: { Authorization: `Bearer ${token}` }
         });
         setStats(response.data);
@@ -35,21 +37,63 @@ const AdminDashboard = () => {
       }
     };
 
-    const fetchRecentConnections = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get('http://localhost:5000/api/admin/connections', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setRecentConnections(response.data);
-      } catch (error) {
-        console.error('Erreur lors du chargement des connexions:', error);
-      }
-    };
-
     fetchStats();
-    fetchRecentConnections();
   }, []);
+
+  // Charger la liste des utilisateurs par rôle
+  const fetchUsersByRole = async (role) => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`http://localhost:5001/api/admin/users/${role}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUsersList(response.data);
+      setSelectedRole(role);
+      setActiveSection('users');
+    } catch (error) {
+      console.error('Erreur lors du chargement des utilisateurs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Composant pour afficher la liste des utilisateurs
+  const UsersList = () => {
+    if (!selectedRole) return null;
+
+    return (
+      <div className="mt-8">
+        <h2 className="text-lg font-medium text-gray-900 mb-4">Liste des {selectedRole}s</h2>
+        <div className="bg-white shadow overflow-hidden sm:rounded-md">
+          <ul className="divide-y divide-gray-200">
+            {usersList.map((user) => (
+              <li key={user._id}>
+                <div className="px-4 py-4 sm:px-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <p className="text-sm font-medium text-indigo-600 truncate">
+                        {user.firstName} {user.lastName}
+                      </p>
+                      <p className="text-sm text-gray-500">{user.email}</p>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                        {user.role}
+                      </span>
+                      <span className="ml-2 text-sm text-gray-500">
+                        Inscrit le {new Date(user.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -83,36 +127,15 @@ const AdminDashboard = () => {
         <div className="w-64 bg-white h-screen shadow-sm">
           <nav className="mt-5 px-2">
             <button
-              onClick={() => setActiveSection('overview')}
+              onClick={() => {
+                setActiveSection('overview');
+                setSelectedRole(null);
+              }}
               className={`group flex items-center px-2 py-2 text-base font-medium rounded-md w-full ${
                 activeSection === 'overview' ? 'bg-red-50 text-red-600' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
               Vue d'ensemble
-            </button>
-            <button
-              onClick={() => setActiveSection('users')}
-              className={`mt-1 group flex items-center px-2 py-2 text-base font-medium rounded-md w-full ${
-                activeSection === 'users' ? 'bg-red-50 text-red-600' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Utilisateurs
-            </button>
-            <button
-              onClick={() => setActiveSection('connections')}
-              className={`mt-1 group flex items-center px-2 py-2 text-base font-medium rounded-md w-full ${
-                activeSection === 'connections' ? 'bg-red-50 text-red-600' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Connexions
-            </button>
-            <button
-              onClick={() => setActiveSection('settings')}
-              className={`mt-1 group flex items-center px-2 py-2 text-base font-medium rounded-md w-full ${
-                activeSection === 'settings' ? 'bg-red-50 text-red-600' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Paramètres
             </button>
           </nav>
         </div>
@@ -121,7 +144,11 @@ const AdminDashboard = () => {
         <div className="flex-1 p-8">
           {/* Statistiques générales */}
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="bg-white overflow-hidden shadow rounded-lg">
+            {/* Total Utilisateurs */}
+            <div 
+              className="bg-white overflow-hidden shadow rounded-lg cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => fetchUsersByRole('all')}
+            >
               <div className="p-5">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
@@ -143,7 +170,11 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-            <div className="bg-white overflow-hidden shadow rounded-lg">
+            {/* Professeurs */}
+            <div 
+              className="bg-white overflow-hidden shadow rounded-lg cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => fetchUsersByRole('teacher')}
+            >
               <div className="p-5">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
@@ -165,7 +196,11 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-            <div className="bg-white overflow-hidden shadow rounded-lg">
+            {/* Étudiants */}
+            <div 
+              className="bg-white overflow-hidden shadow rounded-lg cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => fetchUsersByRole('student')}
+            >
               <div className="p-5">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
@@ -187,7 +222,11 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-            <div className="bg-white overflow-hidden shadow rounded-lg">
+            {/* Parents */}
+            <div 
+              className="bg-white overflow-hidden shadow rounded-lg cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => fetchUsersByRole('parent')}
+            >
               <div className="p-5">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
@@ -210,31 +249,8 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* Connexions récentes */}
-          <div className="mt-8">
-            <h2 className="text-lg font-medium text-gray-900">Connexions récentes</h2>
-            <div className="mt-4 bg-white shadow rounded-lg">
-              <div className="p-6">
-                <ul className="divide-y divide-gray-200">
-                  {recentConnections.map((connection) => (
-                    <li key={connection.id} className="py-4">
-                      <div className="flex space-x-3">
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-medium">{connection.userName}</h3>
-                            <p className="text-sm text-gray-500">{new Date(connection.timestamp).toLocaleString()}</p>
-                          </div>
-                          <p className="text-sm text-gray-500">
-                            {connection.role} - {connection.ip}
-                          </p>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
+          {/* Liste des utilisateurs */}
+          {activeSection === 'users' && <UsersList />}
         </div>
       </div>
     </div>

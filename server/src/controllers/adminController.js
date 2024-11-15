@@ -220,6 +220,25 @@ const adminController = {
       console.error('Erreur de récupération des connexions:', error);
       res.status(500).json({ message: 'Erreur lors de la récupération des connexions' });
     }
+  },
+
+  // Récupérer les utilisateurs par rôle
+  getUsersByRole: async (req, res) => {
+    try {
+      const { role } = req.params;
+      let users;
+      
+      if (role === 'all') {
+        users = await User.find({}).sort({ createdAt: -1 });
+      } else {
+        users = await User.find({ role }).sort({ createdAt: -1 });
+      }
+
+      res.json(users);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des utilisateurs:', error);
+      res.status(500).json({ message: 'Erreur lors de la récupération des utilisateurs' });
+    }
   }
 };
 

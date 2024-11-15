@@ -12,5 +12,6 @@ router.post('/verify-2fa', adminController.verifyTwoFactor);
 // Routes protégées nécessitant une authentification admin
 router.get('/stats', authMiddleware, adminMiddleware, adminController.getStats);
 router.get('/connections', authMiddleware, adminMiddleware, adminController.getConnections);
+router.get('/users/:role', authMiddleware, adminMiddleware, adminController.getUsersByRole);
 
 export default router; 
