@@ -24,7 +24,7 @@ const CompleteTeacherRegistration = () => {
 
     const verifyToken = async () => {
       try {
-        const response = await axios.post('http://localhost:5001/api/users/verify-teacher-token', { token });
+        const response = await axios.post('http://localhost:5003/api/users/verify-teacher-token', { token });
         setTokenData(response.data);
       } catch (error) {
         setError('Ce lien est invalide ou a expiré');
@@ -54,7 +54,7 @@ const CompleteTeacherRegistration = () => {
       const searchParams = new URLSearchParams(location.search);
       const token = searchParams.get('token');
 
-      const response = await axios.post('http://localhost:5001/api/users/complete-teacher-registration', {
+      const response = await axios.post('http://localhost:5003/api/users/complete-teacher-registration', {
         token,
         password: formData.password
       });
@@ -69,7 +69,100 @@ const CompleteTeacherRegistration = () => {
     }
   };
 
-  // ... reste du composant (même structure que CompleteManagerRegistration) ...
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+            <div className="bg-red-50 border-l-4 border-red-400 p-4">
+              <p className="text-red-700">{error}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!tokenData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+            <div className="flex justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          Finaliser votre compte Professeur
+        </h2>
+        <p className="mt-2 text-center text-sm text-gray-600">
+          Bienvenue {tokenData.firstName} ! Veuillez choisir votre mot de passe.
+        </p>
+      </div>
+
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-400 p-4">
+                <p className="text-red-700">{error}</p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Mot de passe
+              </label>
+              <div className="mt-1">
+                <input
+                  type="password"
+                  name="password"
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Confirmer le mot de passe
+              </label>
+              <div className="mt-1">
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  required
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                {loading ? 'Création en cours...' : 'Finaliser mon compte'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default CompleteTeacherRegistration; 
