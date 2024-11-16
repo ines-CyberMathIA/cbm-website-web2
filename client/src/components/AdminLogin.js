@@ -4,7 +4,7 @@ import axios from 'axios';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1); // 1: login, 2: 2FA
+  const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     login: '',
     password: '',
@@ -25,30 +25,54 @@ const AdminLogin = () => {
 
     try {
       if (step === 1) {
-        // Première étape : vérification du login/mot de passe
-        const response = await axios.post('http://localhost:5001/api/admin/login', {
+        console.log('Tentative de connexion avec:', {
           login: formData.login,
           password: formData.password
         });
 
+        const response = await axios.post('http://localhost:5003/api/admin/login', {
+          login: formData.login,
+          password: formData.password
+        });
+
+        console.log('Réponse du serveur:', response.data);
+
         if (response.data.requireTwoFactor) {
-          // Un code 2FA a été envoyé par email
           setStep(2);
+          if (process.env.NODE_ENV === 'development' && response.data.testCode) {
+            console.log('Code 2FA (dev):', response.data.testCode);
+          }
         }
       } else {
-        // Deuxième étape : vérification du code 2FA
-        const response = await axios.post('http://localhost:5001/api/admin/verify-2fa', {
+        console.log('Envoi du code 2FA:', formData.twoFactorCode);
+        
+        const response = await axios.post('http://localhost:5003/api/admin/verify-2fa', {
           login: formData.login,
           twoFactorCode: formData.twoFactorCode
         });
 
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        navigate('/admin-dashboard');
+        console.log('Réponse vérification 2FA:', response.data);
+
+        if (response.data.token) {
+          localStorage.setItem('token', response.data.token);
+          localStorage.setItem('user', JSON.stringify(response.data.user));
+          navigate('/admin-dashboard');
+        } else {
+          setError('Erreur lors de la vérification du code');
+        }
       }
     } catch (error) {
       console.error('Erreur de connexion:', error);
-      setError(error.response?.data?.message || 'Une erreur est survenue');
+      if (error.response) {
+        console.error('Réponse d\'erreur:', error.response.data);
+        setError(error.response.data.message || 'Erreur de connexion');
+      } else if (error.request) {
+        console.error('Pas de réponse reçue');
+        setError('Le serveur ne répond pas');
+      } else {
+        console.error('Erreur de configuration:', error.message);
+        setError('Erreur de configuration de la requête');
+      }
     } finally {
       setLoading(false);
     }
@@ -60,6 +84,9 @@ const AdminLogin = () => {
         <h2 className="text-center text-3xl font-extrabold text-gray-900">
           Administration CyberMathIA
         </h2>
+        <p className="mt-2 text-center text-sm text-gray-600">
+          {step === 1 ? 'Connectez-vous à votre compte' : 'Entrez le code de vérification'}
+        </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -139,7 +166,7 @@ const AdminLogin = () => {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Vérification...
+                    {step === 1 ? 'Connexion...' : 'Vérification...'}
                   </span>
                 ) : (
                   step === 1 ? 'Se connecter' : 'Vérifier'

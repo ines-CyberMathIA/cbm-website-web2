@@ -4,47 +4,90 @@ import nodemailer from 'nodemailer';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
-// Configuration du transporteur email avec les nouveaux identifiants
+// Configuration du transporteur email
 const transporter = nodemailer.createTransport({
   service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
   auth: {
-    user: 'cybermathia@gmail.com',  // Email configuré
-    pass: 'wuig znrg uggv tydt'     // Mot de passe d'application généré
+    user: 'noreply.cybermathia@gmail.com',
+    pass: 'zayf pfpp iatp dmwm'
+  },
+  debug: true,
+  logger: true
+});
+
+// Test de connexion SMTP au démarrage
+transporter.verify((error, success) => {
+  if (error) {
+    console.error('Erreur de configuration SMTP:', {
+      error: error.message,
+      code: error.code,
+      command: error.command
+    });
+  } else {
+    console.log('Configuration SMTP réussie:', {
+      success,
+      user: 'noreply.cybermathia@gmail.com',
+      host: 'smtp.gmail.com'
+    });
   }
 });
 
-// Fonction pour envoyer le code 2FA
+// Stockage temporaire des codes 2FA (en production, utiliser Redis)
+const twoFactorCodes = new Map();
+
+// Fonction pour envoyer le code 2FA avec plus de logs
 const send2FACode = async (code) => {
   try {
-    await transporter.sendMail({
-      from: 'CyberMathIA Admin <cybermathia@gmail.com>',
-      to: 'admin@cybermathia.com',
+    console.log('Préparation de l\'envoi d\'email...');
+    
+    // Configuration de l'email
+    const mailOptions = {
+      from: '"CyberMathIA Admin" <noreply.cybermathia@gmail.com>',
+      to: 'admin@cybermathia.com', // Changez ceci par votre email pour les tests
       subject: 'Code de vérification CyberMathIA',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #4F46E5;">Code de vérification administrateur</h1>
           <p style="font-size: 18px;">Votre code de vérification est : <strong style="color: #4F46E5; font-size: 24px;">${code}</strong></p>
           <p>Ce code expire dans 5 minutes.</p>
-          <p style="color: #EF4444;">Si vous n'avez pas demandé ce code, veuillez sécuriser votre compte immédiatement.</p>
-          <hr>
-          <p style="color: #6B7280; font-size: 12px;">CyberMathIA - Administration</p>
         </div>
-      `
+      `,
+      auth: {
+        user: 'noreply.cybermathia@gmail.com',
+        pass: 'zayf pfpp iatp dmwm'
+      }
+    };
+
+    console.log('Tentative d\'envoi avec les options:', {
+      from: mailOptions.from,
+      to: mailOptions.to,
+      subject: mailOptions.subject
     });
-    console.log('Email 2FA envoyé avec succès à admin@cybermathia.com');
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Email envoyé avec succès:', {
+      messageId: info.messageId,
+      response: info.response,
+      accepted: info.accepted,
+      rejected: info.rejected
+    });
+
     return true;
   } catch (error) {
-    console.error('Erreur lors de l\'envoi de l\'email:', error);
-    console.error('Détails:', error.message);
+    console.error('Erreur détaillée lors de l\'envoi:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      command: error.command
+    });
     return false;
   }
 };
 
-// Stockage temporaire des codes 2FA (en production, utiliser Redis)
-const twoFactorCodes = new Map();
-
 const adminController = {
-  // Connexion admin - première étape
   login: async (req, res) => {
     try {
       console.log('Tentative de connexion admin:', req.body);
@@ -52,31 +95,18 @@ const adminController = {
 
       // Vérifier le login
       if (login !== 'admin_cybermathia') {
-        console.log('Login incorrect:', login);
         return res.status(401).json({ message: 'Identifiants incorrects' });
       }
 
       // Vérifier si l'utilisateur admin existe
       const admin = await User.findOne({ email: 'admin@cybermathia.com', role: 'admin' });
-      console.log('Admin trouvé:', admin ? {
-        email: admin.email,
-        role: admin.role,
-        passwordHash: admin.password.substring(0, 10) + '...'
-      } : 'Non');
-      
       if (!admin) {
-        console.log('Admin non trouvé dans la base de données');
         return res.status(401).json({ message: 'Compte administrateur non trouvé' });
       }
 
       // Vérifier le mot de passe
       const isValidPassword = await bcrypt.compare(password, admin.password);
-      console.log('Mot de passe fourni:', password);
-      console.log('Hash stocké:', admin.password);
-      console.log('Mot de passe valide:', isValidPassword);
-      
       if (!isValidPassword) {
-        console.log('Mot de passe incorrect');
         return res.status(401).json({ message: 'Identifiants incorrects' });
       }
 
@@ -90,28 +120,23 @@ const adminController = {
 
       console.log('Code 2FA généré:', twoFactorCode);
 
-      // Pour le développement, afficher le code dans la console
-      console.log('Code 2FA pour test:', twoFactorCode);
-
-      // Envoyer le code par email
+      // Toujours essayer d'envoyer l'email, même en développement
       const emailSent = await send2FACode(twoFactorCode);
-      if (!emailSent) {
-        return res.status(500).json({ message: 'Erreur lors de l\'envoi du code de vérification' });
-      }
+      console.log('Statut envoi email:', emailSent);
 
-      res.json({ 
-        message: 'Code de vérification envoyé', 
+      // Envoyer la réponse avec le code en développement
+      res.json({
+        message: emailSent ? 'Code de vérification envoyé' : 'Code de vérification généré',
         requireTwoFactor: true,
-        // En développement uniquement, on envoie aussi le code dans la réponse
         testCode: process.env.NODE_ENV === 'development' ? twoFactorCode : undefined
       });
+
     } catch (error) {
       console.error('Erreur de connexion admin:', error);
       res.status(500).json({ message: 'Erreur lors de la connexion' });
     }
   },
 
-  // Vérification du code 2FA
   verifyTwoFactor: async (req, res) => {
     try {
       const { login, twoFactorCode } = req.body;
@@ -152,30 +177,6 @@ const adminController = {
 
       // Supprimer le code 2FA utilisé
       twoFactorCodes.delete(login);
-
-      // Enregistrer la connexion
-      await LoginLog.create({
-        userId: admin._id,
-        userName: `${admin.firstName} ${admin.lastName}`,
-        role: 'admin',
-        ip: req.ip,
-        userAgent: req.headers['user-agent']
-      });
-
-      // Envoyer une notification de connexion
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: 'admin@cybermathia.com',
-        subject: 'Nouvelle connexion admin détectée',
-        html: `
-          <h1>Nouvelle connexion administrateur</h1>
-          <p>Une nouvelle connexion a été détectée sur votre compte.</p>
-          <p>IP: ${req.ip}</p>
-          <p>Navigateur: ${req.headers['user-agent']}</p>
-          <p>Date: ${new Date().toLocaleString()}</p>
-          <p>Si ce n'était pas vous, veuillez sécuriser votre compte immédiatement.</p>
-        `
-      });
 
       res.json({
         token,
@@ -242,7 +243,7 @@ const adminController = {
     }
   },
 
-  // Ajouter cette méthode au contrôleur admin
+  // Créer un manager
   createManager: async (req, res) => {
     try {
       const { firstName, lastName, email } = req.body;
@@ -264,7 +265,7 @@ const adminController = {
       const inviteUrl = `http://localhost:3000/complete-registration?token=${inviteToken}`;
       
       await transporter.sendMail({
-        from: 'CyberMathIA <cybermathia@gmail.com>',
+        from: process.env.EMAIL_USER,
         to: email,
         subject: 'Invitation à rejoindre CyberMathIA en tant que Manager',
         html: `
@@ -279,10 +280,6 @@ const adminController = {
               </a>
             </div>
             <p style="color: #666;">Ce lien expire dans 24 heures.</p>
-            <hr style="margin: 30px 0;">
-            <p style="color: #666; font-size: 12px;">
-              Si vous n'attendiez pas cette invitation, vous pouvez ignorer cet email.
-            </p>
           </div>
         `
       });
