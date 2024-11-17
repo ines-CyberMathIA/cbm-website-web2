@@ -15,6 +15,7 @@ const Calendar = () => {
     endTime: '09:30'  // Par défaut 1h30
   });
   const [selectedSlots, setSelectedSlots] = useState([]);
+  const [mode, setMode] = useState('view'); // 'view', 'add' ou 'delete'
 
   const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
   
@@ -30,59 +31,96 @@ const Calendar = () => {
     return slots;
   };
 
-  // Vérifier si la sélection/désélection maintient la durée minimale de 1h30
-  const wouldMaintainMinimumDuration = (day, time, isSelecting) => {
-    const allSlots = [...availabilities, ...unsavedAvailabilities];
-    let newSlots = [...allSlots];
+  // Modifier la fonction wouldMaintainMinimumDuration
+  const wouldMaintainMinimumDuration = (day, time, isAdding) => {
+    // Récupérer tous les créneaux du jour
+    let daySlots = [...availabilities, ...unsavedAvailabilities]
+      .filter(slot => slot.day === day)
+      .filter(slot => !slot.toDelete); // Ignorer les créneaux marqués pour suppression
 
-    if (isSelecting) {
-      newSlots.push({ day, time });
+    // Simuler l'ajout ou la suppression
+    if (isAdding) {
+      daySlots.push({ day, time });
     } else {
-      newSlots = newSlots.filter(slot => !(slot.day === day && slot.time === time));
+      daySlots = daySlots.filter(slot => !(slot.day === day && slot.time === time));
     }
 
-    // Grouper les créneaux consécutifs
-    const groups = [];
+    // Trier les créneaux par heure
+    daySlots.sort((a, b) => a.time.localeCompare(b.time));
+
+    // Regrouper les créneaux consécutifs
     let currentGroup = [];
-    
-    newSlots
-      .filter(slot => slot.day === day)
-      .sort((a, b) => a.time.localeCompare(b.time))
-      .forEach(slot => {
-        if (currentGroup.length === 0) {
+    const groups = [];
+
+    daySlots.forEach((slot, index) => {
+      if (currentGroup.length === 0) {
+        currentGroup.push(slot);
+      } else {
+        const lastSlot = currentGroup[currentGroup.length - 1];
+        const lastTime = new Date(`2000-01-01T${lastSlot.time}`);
+        const currentTime = new Date(`2000-01-01T${slot.time}`);
+        const diffMinutes = (currentTime - lastTime) / (1000 * 60);
+
+        if (diffMinutes === 30) {
           currentGroup.push(slot);
         } else {
-          const lastSlot = currentGroup[currentGroup.length - 1];
-          const lastTime = new Date(`2000-01-01T${lastSlot.time}`);
-          const currentTime = new Date(`2000-01-01T${slot.time}`);
-          const diffMinutes = (currentTime - lastTime) / (1000 * 60);
-          
-          if (diffMinutes === 30) {
-            currentGroup.push(slot);
-          } else {
-            groups.push([...currentGroup]);
-            currentGroup = [slot];
-          }
+          groups.push([...currentGroup]);
+          currentGroup = [slot];
         }
-      });
-    
+      }
+    });
+
     if (currentGroup.length > 0) {
       groups.push(currentGroup);
     }
+
+    // Si aucun groupe n'est trouvé, c'est valide (pas de contrainte à vérifier)
+    if (groups.length === 0) return true;
 
     // Vérifier que chaque groupe fait au moins 1h30 (3 créneaux de 30 minutes)
     return groups.every(group => group.length >= 3);
   };
 
-  // Gérer le clic sur un créneau
+  // Gérer le clic sur un créneau en fonction du mode
   const handleTimeSlotClick = (day, time) => {
-    const slotKey = `${day}-${time}`;
-    const isSelected = selectedSlots.some(slot => slot.day === day && slot.time === time);
+    // Si on est en mode vue, ne rien faire
+    if (mode === 'view') return;
 
-    if (isSelected) {
-      setSelectedSlots(selectedSlots.filter(slot => !(slot.day === day && slot.time === time)));
-    } else {
-      setSelectedSlots([...selectedSlots, { day, time }]);
+    // En mode ajout, on ne peut cliquer que sur les cases vides
+    if (mode === 'add') {
+      const isAvailable = [...availabilities, ...unsavedAvailabilities]
+        .some(slot => slot.day === day && slot.time === time);
+      
+      if (!isAvailable) {
+        // Vérifier si le créneau est déjà sélectionné
+        const isSelected = selectedSlots.some(slot => slot.day === day && slot.time === time);
+        
+        if (isSelected) {
+          // Désélectionner le créneau
+          setSelectedSlots(prev => prev.filter(slot => !(slot.day === day && slot.time === time)));
+        } else {
+          // Sélectionner le créneau
+          setSelectedSlots(prev => [...prev, { day, time }]);
+        }
+      }
+    }
+    // En mode suppression, on ne peut cliquer que sur les cases disponibles
+    else if (mode === 'delete') {
+      const isAvailable = availabilities
+        .some(slot => slot.day === day && slot.time === time);
+      
+      if (isAvailable) {
+        const isSelected = selectedSlots
+          .some(slot => slot.day === day && slot.time === time);
+
+        if (isSelected) {
+          setSelectedSlots(prev => 
+            prev.filter(slot => !(slot.day === day && slot.time === time))
+          );
+        } else {
+          setSelectedSlots(prev => [...prev, { day, time }]);
+        }
+      }
     }
   };
 
@@ -260,68 +298,57 @@ const Calendar = () => {
   // Modifier la fonction de sauvegarde
   const saveAvailabilities = async () => {
     try {
-      // Vérifier d'abord si les modifications sont valides
-      const remainingSlots = availabilities.filter(slot => 
-        !selectedSlots.some(selected => 
-          selected.day === slot.day && selected.time === slot.time
-        )
-      );
+      setSaveStatus('saving');
 
-      // Vérifier que toutes les plages horaires respectent la durée minimale
-      const allSlots = [...remainingSlots, ...unsavedAvailabilities.filter(slot => !slot.toDelete)];
-      
-      // Grouper par jour
-      const slotsByDay = {};
-      allSlots.forEach(slot => {
-        if (!slotsByDay[slot.day]) {
-          slotsByDay[slot.day] = [];
+      // Créer une copie des disponibilités actuelles
+      let newAvailabilities = [...availabilities];
+
+      // En mode ajout, ajouter les créneaux sélectionnés
+      if (mode === 'add' && selectedSlots.length > 0) {
+        // Vérifier que les nouveaux créneaux forment des plages valides
+        const allSlots = [...availabilities, ...selectedSlots];
+        const slotsByDay = groupSlotsByDay(allSlots);
+        
+        // Vérifier chaque jour
+        for (const day in slotsByDay) {
+          const groups = getConsecutiveGroups(slotsByDay[day]);
+          if (!groups.every(group => group.length >= 3)) {
+            setError("Les plages horaires doivent faire au moins 1h30");
+            setSaveStatus('error');
+            return;
+          }
         }
-        slotsByDay[slot.day].push(slot);
-      });
 
-      // Vérifier chaque jour
-      for (const day in slotsByDay) {
-        if (slotsByDay[day].length === 0) continue;
+        newAvailabilities = allSlots;
+      }
+      // En mode suppression, retirer les créneaux sélectionnés
+      else if (mode === 'delete' && selectedSlots.length > 0) {
+        // Filtrer les créneaux à conserver
+        const remainingSlots = availabilities.filter(slot => 
+          !selectedSlots.some(selected => 
+            selected.day === slot.day && selected.time === slot.time
+          )
+        );
 
-        const daySlots = slotsByDay[day].sort((a, b) => a.time.localeCompare(b.time));
-        let currentGroup = [];
-
-        for (let i = 0; i < daySlots.length; i++) {
-          const currentSlot = daySlots[i];
-          
-          if (currentGroup.length === 0) {
-            currentGroup.push(currentSlot);
-          } else {
-            const lastSlot = currentGroup[currentGroup.length - 1];
-            const lastTime = new Date(`2000-01-01T${lastSlot.time}`);
-            const currentTime = new Date(`2000-01-01T${currentSlot.time}`);
-            const diffMinutes = (currentTime - lastTime) / (1000 * 60);
-
-            if (diffMinutes === 30) {
-              currentGroup.push(currentSlot);
-            } else {
-              // Vérifier le groupe précédent
-              if (currentGroup.length < 3) { // moins de 1h30
-                setError("Impossible de sauvegarder : certaines plages horaires sont inférieures à 1h30");
-                return;
-              }
-              currentGroup = [currentSlot];
+        // Vérifier que les plages restantes sont valides
+        const slotsByDay = groupSlotsByDay(remainingSlots);
+        
+        for (const day in slotsByDay) {
+          if (slotsByDay[day].length > 0) {  // Ne vérifier que les jours avec des créneaux
+            const groups = getConsecutiveGroups(slotsByDay[day]);
+            if (!groups.every(group => group.length >= 3)) {
+              setError("La suppression créerait des plages horaires inférieures à 1h30");
+              setSaveStatus('error');
+              return;
             }
           }
         }
 
-        // Vérifier le dernier groupe
-        if (currentGroup.length > 0 && currentGroup.length < 3) {
-          setError("Impossible de sauvegarder : certaines plages horaires sont inférieures à 1h30");
-          return;
-        }
+        newAvailabilities = remainingSlots;
       }
 
-      // Si toutes les vérifications sont passées, procéder à la sauvegarde
-      setSaveStatus('saving');
-      
-      // Convertir en plages horaires
-      const ranges = convertSlotsToRanges(allSlots);
+      // Convertir en plages horaires pour la sauvegarde
+      const ranges = convertSlotsToRanges(newAvailabilities);
       
       // Envoyer au serveur
       await axios.post(
@@ -335,9 +362,10 @@ const Calendar = () => {
       );
       
       // Mettre à jour l'état local
-      setAvailabilities(allSlots);
-      setUnsavedAvailabilities([]);
+      setAvailabilities(newAvailabilities);
       setSelectedSlots([]);
+      setUnsavedAvailabilities([]);
+      setMode('view');
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(''), 3000);
     } catch (error) {
@@ -345,6 +373,54 @@ const Calendar = () => {
       setError('Erreur lors de la sauvegarde des disponibilités');
       setSaveStatus('error');
     }
+  };
+
+  // Fonction utilitaire pour grouper les créneaux par jour
+  const groupSlotsByDay = (slots) => {
+    const groups = {};
+    slots.forEach(slot => {
+      if (!groups[slot.day]) {
+        groups[slot.day] = [];
+      }
+      groups[slot.day].push(slot);
+    });
+    
+    // Trier les créneaux de chaque jour
+    for (const day in groups) {
+      groups[day].sort((a, b) => a.time.localeCompare(b.time));
+    }
+    
+    return groups;
+  };
+
+  // Fonction pour obtenir les groupes de créneaux consécutifs
+  const getConsecutiveGroups = (slots) => {
+    const groups = [];
+    let currentGroup = [];
+
+    slots.forEach((slot, index) => {
+      if (currentGroup.length === 0) {
+        currentGroup.push(slot);
+      } else {
+        const lastSlot = currentGroup[currentGroup.length - 1];
+        const lastTime = new Date(`2000-01-01T${lastSlot.time}`);
+        const currentTime = new Date(`2000-01-01T${slot.time}`);
+        const diffMinutes = (currentTime - lastTime) / (1000 * 60);
+
+        if (diffMinutes === 30) {
+          currentGroup.push(slot);
+        } else {
+          groups.push([...currentGroup]);
+          currentGroup = [slot];
+        }
+      }
+    });
+
+    if (currentGroup.length > 0) {
+      groups.push(currentGroup);
+    }
+
+    return groups;
   };
 
   // Gérer le clic sur un créneau sauvegardé
@@ -418,32 +494,58 @@ const Calendar = () => {
 
   return (
     <div className="space-y-6">
-      {/* En-tête avec boutons */}
+      {/* En-tête avec boutons de mode */}
       <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow">
         <div className="flex items-center space-x-4">
           <h2 className="text-2xl font-bold text-gray-900">
             Planning des disponibilités
           </h2>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Ajouter une disponibilité
-          </button>
-          {selectedSlots.length > 0 && (
+          <div className="flex space-x-2">
             <button
-              onClick={handleDeleteSelection}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 flex items-center"
+              onClick={() => {
+                setMode('add');
+                setSelectedSlots([]);
+              }}
+              className={`px-4 py-2 rounded-md flex items-center ${
+                mode === 'add'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Ajouter des disponibilités
+            </button>
+            <button
+              onClick={() => {
+                setMode('delete');
+                setUnsavedAvailabilities([]);
+              }}
+              className={`px-4 py-2 rounded-md flex items-center ${
+                mode === 'delete'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
             >
               <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
-              Supprimer la sélection ({selectedSlots.length})
+              Supprimer des disponibilités
             </button>
-          )}
+            {(mode !== 'view' || selectedSlots.length > 0 || unsavedAvailabilities.length > 0) && (
+              <button
+                onClick={() => {
+                  setMode('view');
+                  setSelectedSlots([]);
+                  setUnsavedAvailabilities([]);
+                }}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+              >
+                Annuler
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex items-center space-x-4">
           {saveStatus === 'saving' && (
@@ -455,13 +557,15 @@ const Calendar = () => {
           {saveStatus === 'error' && (
             <span className="text-red-600">Erreur de sauvegarde !</span>
           )}
-          <button
-            onClick={saveAvailabilities}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-            disabled={saveStatus === 'saving'}
-          >
-            Sauvegarder
-          </button>
+          {(selectedSlots.length > 0 || unsavedAvailabilities.length > 0) && (
+            <button
+              onClick={saveAvailabilities}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+              disabled={saveStatus === 'saving'}
+            >
+              Sauvegarder les modifications
+            </button>
+          )}
         </div>
       </div>
 
@@ -495,24 +599,29 @@ const Calendar = () => {
                   .some(slot => slot.day === day && slot.time === time);
                 const hasCourse = courses
                   .some(c => c.day === day && c.time === time);
+                const isAvailable = availabilities
+                  .some(slot => slot.day === day && slot.time === time);
 
                 return (
                   <button
                     key={`${day}-${time}`}
                     onClick={() => !hasCourse && handleTimeSlotClick(day, time)}
-                    disabled={hasCourse}
+                    disabled={hasCourse || (mode === 'delete' && !isAvailable)}
                     className={`
                       border-r last:border-r-0 p-2 min-h-[30px] transition-all duration-200
                       ${hasCourse 
                         ? 'bg-blue-100 cursor-not-allowed' 
-                        : selectedSlots.some(slot => slot.day === day && slot.time === time)
-                          ? 'bg-yellow-100 hover:bg-yellow-200 border-2 border-yellow-500'  // Créneau sélectionné
-                          : availabilities.some(slot => slot.day === day && slot.time === time)
-                            ? 'bg-emerald-100 hover:bg-emerald-200 border-l-4 border-emerald-500'  // Créneau sauvegardé
-                            : unsavedAvailabilities.some(slot => slot.day === day && slot.time === time)
-                              ? 'bg-emerald-50 hover:bg-emerald-100'  // Nouveau créneau non sauvegardé
-                              : 'hover:bg-gray-50'  // Case vide
+                        : mode === 'delete' && selectedSlots.some(slot => slot.day === day && slot.time === time)
+                          ? 'bg-red-100 hover:bg-red-200 border-2 border-red-500'  // Sélectionné pour suppression
+                          : mode === 'add' && selectedSlots.some(slot => slot.day === day && slot.time === time)
+                            ? 'bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-500'  // Sélectionné pour ajout
+                            : isAvailable
+                              ? 'bg-emerald-100 hover:bg-emerald-200 border-l-4 border-emerald-500'  // Disponible
+                              : mode === 'add'
+                                ? 'hover:bg-emerald-50 cursor-pointer'  // Mode ajout
+                                : ''  // Mode normal
                       }
+                      ${mode === 'delete' && !isAvailable ? 'cursor-not-allowed opacity-50' : ''}
                     `}
                   >
                     {hasCourse && (
