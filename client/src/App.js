@@ -6,6 +6,7 @@ import ParentDashboard from './components/ParentDashboard';
 import AdminLogin from './components/AdminLogin';
 import AdminDashboard from './components/AdminDashboard';
 import ManagerDashboard from './components/ManagerDashboard';
+import TeacherDashboard from './components/TeacherDashboard';
 import CompleteManagerRegistration from './components/CompleteManagerRegistration';
 import CompleteTeacherRegistration from './components/CompleteTeacherRegistration';
 
@@ -111,6 +112,7 @@ function App() {
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
         <Route path="/manager-dashboard" element={<ManagerDashboard />} />
+        <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
         <Route path="/complete-registration" element={<CompleteManagerRegistration />} />
         <Route path="/complete-teacher-registration" element={<CompleteTeacherRegistration />} />
       </Routes>
