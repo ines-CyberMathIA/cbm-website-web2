@@ -36,15 +36,103 @@ const Calendar = () => {
     fetchAvailabilities();
   }, []);
 
+  // Fonction pour vérifier si une plage horaire respecte la durée minimale
+  const isValidDuration = (startTime, endTime) => {
+    const start = new Date(`2000-01-01T${startTime}`);
+    const end = new Date(`2000-01-01T${endTime}`);
+    const diffInMinutes = (end - start) / (1000 * 60);
+    return diffInMinutes >= 90; // 1h30 = 90 minutes
+  };
+
+  // Fonction pour vérifier si l'ajout/suppression d'un créneau maintient la durée minimale
+  const wouldMaintainMinimumDuration = (day, time, isAdding) => {
+    // Trouver tous les créneaux contigus pour ce jour
+    const dayAvailabilities = availabilities
+      .filter(a => a.day === day)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+    // Simuler l'ajout ou la suppression du créneau
+    let newAvailabilities = [...dayAvailabilities];
+    if (isAdding) {
+      newAvailabilities.push({ startTime: time, endTime: addMinutes(time, 30) });
+    } else {
+      newAvailabilities = newAvailabilities.filter(a => 
+        !(a.startTime <= time && addMinutes(time, 30) <= a.endTime)
+      );
+    }
+
+    // Fusionner les créneaux contigus
+    const mergedSlots = mergeContiguousSlots(newAvailabilities);
+
+    // Vérifier que chaque plage fusionnée respecte la durée minimale
+    return mergedSlots.every(slot => isValidDuration(slot.startTime, slot.endTime));
+  };
+
+  // Fonction utilitaire pour ajouter des minutes à une heure au format "HH:mm"
+  const addMinutes = (time, minutes) => {
+    const [hours, mins] = time.split(':').map(Number);
+    const date = new Date(2000, 0, 1, hours, mins);
+    date.setMinutes(date.getMinutes() + minutes);
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  };
+
+  // Fonction pour fusionner les créneaux contigus
+  const mergeContiguousSlots = (slots) => {
+    if (slots.length === 0) return [];
+    
+    const sortedSlots = slots.sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const merged = [{ ...sortedSlots[0] }];
+
+    for (let i = 1; i < sortedSlots.length; i++) {
+      const current = sortedSlots[i];
+      const previous = merged[merged.length - 1];
+
+      if (previous.endTime === current.startTime) {
+        previous.endTime = current.endTime;
+      } else {
+        merged.push({ ...current });
+      }
+    }
+
+    return merged;
+  };
+
+  // Modification de handleAddAvailability pour inclure la vérification
   const handleAddAvailability = () => {
+    if (!isValidDuration(newSlot.startTime, newSlot.endTime)) {
+      setError("La durée minimale d'une disponibilité doit être de 1h30");
+      return;
+    }
+
     const newAvailability = {
       id: `${newSlot.day}-${newSlot.startTime}-${newSlot.endTime}`,
       day: newSlot.day,
       startTime: newSlot.startTime,
       endTime: newSlot.endTime
     };
+
+    // Vérifier que l'ajout maintient la durée minimale pour les créneaux existants
+    if (!wouldMaintainMinimumDuration(newSlot.day, newSlot.startTime, true)) {
+      setError("Cette modification créerait une plage horaire inférieure à 1h30");
+      return;
+    }
+
     setAvailabilities([...availabilities, newAvailability]);
     setShowAddModal(false);
+    setError(null);
+  };
+
+  // Modification du modal d'ajout pour inclure la validation
+  const handleTimeChange = (field, value) => {
+    const updatedSlot = { ...newSlot, [field]: value };
+    if (field === 'startTime') {
+      // Calculer automatiquement une heure de fin minimum de 1h30
+      const minEndTime = addMinutes(value, 90);
+      if (updatedSlot.endTime < minEndTime) {
+        updatedSlot.endTime = minEndTime;
+      }
+    }
+    setNewSlot(updatedSlot);
   };
 
   return (
@@ -147,6 +235,11 @@ const Calendar = () => {
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <h3 className="text-lg font-medium mb-4">Ajouter une disponibilité</h3>
+            {error && (
+              <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4 text-red-700">
+                {error}
+              </div>
+            )}
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Jour</label>
@@ -165,7 +258,7 @@ const Calendar = () => {
                 <input
                   type="time"
                   value={newSlot.startTime}
-                  onChange={(e) => setNewSlot({...newSlot, startTime: e.target.value})}
+                  onChange={(e) => handleTimeChange('startTime', e.target.value)}
                   min="06:00"
                   max="22:00"
                   step="1800"
@@ -177,12 +270,15 @@ const Calendar = () => {
                 <input
                   type="time"
                   value={newSlot.endTime}
-                  onChange={(e) => setNewSlot({...newSlot, endTime: e.target.value})}
-                  min="06:00"
+                  onChange={(e) => handleTimeChange('endTime', e.target.value)}
+                  min={addMinutes(newSlot.startTime, 90)}
                   max="22:00"
                   step="1800"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                 />
+                <p className="mt-1 text-sm text-gray-500">
+                  Durée minimale : 1h30
+                </p>
               </div>
               <div className="flex justify-end space-x-3 mt-6">
                 <button
