@@ -97,25 +97,85 @@ const Calendar = () => {
     return merged;
   };
 
-  // Modification de handleAddAvailability pour inclure la vérification
+  // Générer tous les créneaux de 30 minutes
+  const generateTimeSlots = () => {
+    const slots = [];
+    for (let hour = 6; hour <= 22; hour++) {
+      slots.push(`${hour.toString().padStart(2, '0')}:00`);
+      if (hour < 22) {
+        slots.push(`${hour.toString().padStart(2, '0')}:30`);
+      }
+    }
+    return slots;
+  };
+
+  const timeSlots = generateTimeSlots();
+
+  // Fonction pour vérifier si un créneau est contigu à une disponibilité existante
+  const isContiguousToExisting = (day, startTime, endTime) => {
+    const dayAvailabilities = availabilities.filter(a => a.day === day);
+    
+    // Vérifier si le nouveau créneau est adjacent à une disponibilité existante
+    return dayAvailabilities.some(slot => {
+      return slot.endTime === startTime || slot.startTime === endTime;
+    });
+  };
+
+  // Fonction pour calculer la durée totale d'une plage horaire fusionnée
+  const getTotalDuration = (day, startTime, endTime) => {
+    const dayAvailabilities = availabilities
+      .filter(a => a.day === day)
+      .concat([{ day, startTime, endTime }])
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+    // Fusionner les créneaux contigus
+    const mergedSlots = mergeContiguousSlots(dayAvailabilities);
+    
+    // Calculer la durée de chaque plage fusionnée
+    return mergedSlots.map(slot => {
+      const start = new Date(`2000-01-01T${slot.startTime}`);
+      const end = new Date(`2000-01-01T${slot.endTime}`);
+      return (end - start) / (1000 * 60); // durée en minutes
+    });
+  };
+
+  // Modification de handleAddAvailability
   const handleAddAvailability = () => {
-    if (!isValidDuration(newSlot.startTime, newSlot.endTime)) {
-      setError("La durée minimale d'une disponibilité doit être de 1h30");
+    const { day, startTime, endTime } = newSlot;
+
+    // Vérifier que l'heure de fin ne dépasse pas 22:00
+    if (endTime > '22:00') {
+      setError("L'heure de fin ne peut pas dépasser 22:00");
       return;
     }
 
-    const newAvailability = {
-      id: `${newSlot.day}-${newSlot.startTime}-${newSlot.endTime}`,
-      day: newSlot.day,
-      startTime: newSlot.startTime,
-      endTime: newSlot.endTime
-    };
+    // Vérifier si le créneau est contigu à une disponibilité existante
+    const isContigu = isContiguousToExisting(day, startTime, endTime);
+    
+    // Calculer la durée totale après fusion
+    const durations = getTotalDuration(day, startTime, endTime);
+    
+    // Vérifier que toutes les plages fusionnées respectent la durée minimale
+    const allValid = durations.every(duration => duration >= 90);
 
-    // Vérifier que l'ajout maintient la durée minimale pour les créneaux existants
-    if (!wouldMaintainMinimumDuration(newSlot.day, newSlot.startTime, true)) {
+    if (!isContigu && !isValidDuration(startTime, endTime)) {
+      setError("Un nouveau créneau isolé doit faire au moins 1h30");
+      return;
+    }
+
+    if (!allValid) {
       setError("Cette modification créerait une plage horaire inférieure à 1h30");
       return;
     }
+
+    // Ajouter la nouvelle disponibilité avec une heure de fin exacte
+    const newAvailability = {
+      id: `${day}-${startTime}-${endTime}`,
+      day,
+      startTime,
+      endTime,
+      duration: (new Date(`2000-01-01T${endTime}`) - new Date(`2000-01-01T${startTime}`)) / (1000 * 60)
+    };
 
     setAvailabilities([...availabilities, newAvailability]);
     setShowAddModal(false);
@@ -133,6 +193,16 @@ const Calendar = () => {
       }
     }
     setNewSlot(updatedSlot);
+  };
+
+  // Modification de la fonction qui vérifie les disponibilités dans la grille
+  const hasAvailabilityAtTime = (day, time) => {
+    return availabilities.some(a => 
+      a.day === day && 
+      a.startTime <= time &&
+      a.endTime > time && 
+      a.endTime <= '22:00' // Ajouter cette condition
+    );
   };
 
   return (
@@ -175,9 +245,7 @@ const Calendar = () => {
       {/* Grille du calendrier */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="grid grid-cols-8 border-b">
-          {/* Cellule vide pour la colonne des heures */}
           <div className="border-r"></div>
-          {/* En-têtes des jours */}
           {days.map(day => (
             <div key={day} className="text-center font-semibold py-2 border-r last:border-r-0">
               {day}
@@ -185,31 +253,24 @@ const Calendar = () => {
           ))}
         </div>
 
-        {/* Corps du calendrier */}
         <div className="overflow-y-auto max-h-[600px]">
-          {hours.map(hour => (
-            <div key={hour} className="grid grid-cols-8 border-b last:border-b-0">
-              {/* Colonne des heures */}
+          {timeSlots.map(time => (
+            <div key={time} className="grid grid-cols-8 border-b last:border-b-0">
               <div className="border-r p-2 text-sm font-medium text-gray-500 bg-gray-50">
-                {hour}
+                {time}
               </div>
-              {/* Cellules pour chaque jour */}
               {days.map(day => {
-                const hasAvailability = availabilities.some(a => 
-                  a.day === day && 
-                  a.startTime <= hour && 
-                  a.endTime > hour
-                );
+                const hasAvailability = hasAvailabilityAtTime(day, time);
                 const hasCourse = courses.some(c => 
                   c.day === day && 
-                  c.startTime <= hour && 
-                  c.endTime > hour
+                  c.startTime <= time &&
+                  c.endTime > time
                 );
 
                 return (
                   <div
-                    key={`${day}-${hour}`}
-                    className={`border-r last:border-r-0 p-2 min-h-[60px] ${
+                    key={`${day}-${time}`}
+                    className={`border-r last:border-r-0 p-2 min-h-[30px] ${
                       hasCourse
                         ? 'bg-blue-50'
                         : hasAvailability
