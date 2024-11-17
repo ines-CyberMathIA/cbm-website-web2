@@ -492,6 +492,19 @@ const Calendar = () => {
     setError(null);
   };
 
+  // Modifier le useEffect pour le timer du message d'erreur
+  useEffect(() => {
+    let timer;
+    if (error) {
+      timer = setTimeout(() => {
+        setError(null);
+      }, 15000); // 15 secondes au lieu de 30
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [error]);
+
   return (
     <div className="space-y-6">
       {/* En-tête avec boutons de mode */}
