@@ -13,22 +13,32 @@ install:
 	cd $(SERVER_DIR) && npm install
 	@echo "Installation des dépendances du client..."
 	cd $(CLIENT_DIR) && npm install
+	@echo "Installation de @headlessui/react..."
+	cd $(CLIENT_DIR) && npm install @headlessui/react --save
 
 # Démarrage des services
 .PHONY: start
-start: start-server start-client
-
-# Démarrage du serveur
-.PHONY: start-server
-start-server:
-	@echo "Démarrage du serveur..."
-	cd $(SERVER_DIR) && npm run dev
-
-# Démarrage du client
-.PHONY: start-client
-start-client:
+start:
+	@echo "Démarrage du serveur en arrière-plan..."
+	cd $(SERVER_DIR) && npm run dev & 
+	@sleep 5
 	@echo "Démarrage du client..."
 	cd $(CLIENT_DIR) && npm start
+
+# Arrêt des services
+.PHONY: stop
+stop:
+	@echo "Arrêt des services..."
+	-pkill -f "node.*server" || true
+	-pkill -f "node.*react-scripts" || true
+
+# Redémarrage des services
+.PHONY: restart
+restart: stop start
+
+# Redémarrage complet
+.PHONY: restart-all
+restart-all: clean install restart
 
 # Nettoyage
 .PHONY: clean
@@ -43,7 +53,8 @@ help:
 	@echo "Commandes disponibles:"
 	@echo "  make install     - Installe les dépendances"
 	@echo "  make start      - Démarre le serveur et le client"
-	@echo "  make start-server - Démarre uniquement le serveur"
-	@echo "  make start-client - Démarre uniquement le client"
+	@echo "  make stop       - Arrête tous les services"
+	@echo "  make restart    - Redémarre les services"
+	@echo "  make restart-all - Réinstalle tout et redémarre"
 	@echo "  make clean      - Nettoie les dépendances"
 	@echo "  make help       - Affiche cette aide"

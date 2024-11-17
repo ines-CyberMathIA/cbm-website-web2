@@ -33,6 +33,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['college', 'lycee', 'superieur', 'adulte']
   }],
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now

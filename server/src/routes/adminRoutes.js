@@ -14,5 +14,6 @@ router.get('/stats', authMiddleware, adminMiddleware, adminController.getStats);
 router.get('/connections', authMiddleware, adminMiddleware, adminController.getConnections);
 router.get('/users/:role', authMiddleware, adminMiddleware, adminController.getUsersByRole);
 router.post('/create-manager', authMiddleware, adminMiddleware, adminController.createManager);
+router.delete('/users/:userId', authMiddleware, adminMiddleware, adminController.deleteUser);
 
 export default router; 

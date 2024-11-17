@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { Dialog, Transition } from '@headlessui/react';
+import { Fragment } from 'react';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -23,6 +25,9 @@ const AdminDashboard = () => {
     email: ''
   });
   const [modalError, setModalError] = useState('');
+  const [showDeleteButtons, setShowDeleteButtons] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Vérification de l'authentification admin
   useEffect(() => {
@@ -67,34 +72,175 @@ const AdminDashboard = () => {
     }
   };
 
+  // Fonction pour ouvrir la modal de confirmation
+  const handleDeleteClick = (user) => {
+    setUserToDelete(user);
+    setShowDeleteModal(true);
+  };
+
+  // Fonction pour effectuer la suppression
+  const confirmDelete = async () => {
+    try {
+      await axios.delete(`http://localhost:5003/api/admin/users/${userToDelete._id}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      // Mettre à jour la liste des utilisateurs
+      setUsersList(usersList.filter(user => user._id !== userToDelete._id));
+
+      // Mettre à jour les statistiques
+      setStats(prev => ({
+        ...prev,
+        [`total${userToDelete.role.charAt(0).toUpperCase() + userToDelete.role.slice(1)}s`]: prev[`total${userToDelete.role.charAt(0).toUpperCase() + userToDelete.role.slice(1)}s`] - 1,
+        totalUsers: prev.totalUsers - 1
+      }));
+
+      setShowDeleteModal(false);
+      setUserToDelete(null);
+    } catch (error) {
+      console.error('Erreur lors de la suppression:', error);
+      setModalError(error.response?.data?.message || 'Erreur lors de la suppression');
+    }
+  };
+
+  // Modal de confirmation de suppression
+  const DeleteConfirmationModal = () => {
+    return (
+      <Transition appear show={showDeleteModal} as={Fragment}>
+        <Dialog
+          as="div"
+          className="relative z-10"
+          onClose={() => setShowDeleteModal(false)}
+        >
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-25" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                  <Dialog.Title
+                    as="h3"
+                    className="text-lg font-medium leading-6 text-gray-900"
+                  >
+                    Confirmer la suppression
+                  </Dialog.Title>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-500">
+                      Êtes-vous sûr de vouloir supprimer le compte de{' '}
+                      <span className="font-medium text-gray-700">
+                        {userToDelete?.firstName} {userToDelete?.lastName}
+                      </span>
+                      {' '}({userToDelete?.role}) ?
+                    </p>
+                    <p className="mt-2 text-sm text-red-500">
+                      Cette action est irréversible.
+                    </p>
+                  </div>
+
+                  <div className="mt-4 flex justify-end space-x-3">
+                    <button
+                      type="button"
+                      className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
+                      onClick={() => setShowDeleteModal(false)}
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                      onClick={confirmDelete}
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+    );
+  };
+
   // Composant pour afficher la liste des utilisateurs
   const UsersList = () => {
     if (!selectedRole) return null;
 
     return (
       <div className="mt-8">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Liste des {selectedRole}s</h2>
-        <div className="bg-white shadow overflow-hidden sm:rounded-md">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-medium text-gray-900">Liste des {selectedRole}s</h2>
+          {selectedRole !== 'admin' && (
+            <button
+              onClick={() => setShowDeleteButtons(!showDeleteButtons)}
+              className={`px-4 py-2 rounded-md flex items-center ${
+                showDeleteButtons ? 'bg-gray-200 text-gray-700' : 'bg-red-600 text-white hover:bg-red-700'
+              }`}
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              {showDeleteButtons ? 'Terminer' : 'Gérer les comptes'}
+            </button>
+          )}
+        </div>
+
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           <ul className="divide-y divide-gray-200">
             {usersList.map((user) => (
-              <li key={user._id}>
-                <div className="px-4 py-4 sm:px-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <p className="text-sm font-medium text-indigo-600 truncate">
+              <li key={user._id} className="px-4 py-4 sm:px-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                        <span className="text-indigo-800 font-medium">
+                          {user.firstName[0]}{user.lastName[0]}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="ml-4">
+                      <div className="text-sm font-medium text-gray-900">
                         {user.firstName} {user.lastName}
-                      </p>
-                      <p className="text-sm text-gray-500">{user.email}</p>
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {user.email}
+                      </div>
                     </div>
-                    <div className="flex items-center">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                        {user.role}
-                      </span>
-                      <span className="ml-2 text-sm text-gray-500">
-                        Inscrit le {new Date(user.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
+                    <span className="ml-4 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                      {user.role}
+                    </span>
                   </div>
+                  {showDeleteButtons && user.role !== 'admin' && (
+                    <button
+                      onClick={() => handleDeleteClick(user)}
+                      className="ml-2 inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-opacity duration-200"
+                    >
+                      <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Supprimer
+                    </button>
+                  )}
                 </div>
               </li>
             ))}
@@ -485,6 +631,7 @@ const AdminDashboard = () => {
 
       {/* Modal de création de manager */}
       {showManagerModal && <ManagerModal />}
+      <DeleteConfirmationModal />
     </div>
   );
 };

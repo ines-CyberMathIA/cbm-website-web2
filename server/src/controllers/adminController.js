@@ -3,6 +3,7 @@ import LoginLog from '../models/LoginLog.js';
 import nodemailer from 'nodemailer';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import TeacherAvailability from '../models/TeacherAvailability.js';
 
 // Configuration du transporteur email
 const transporter = nodemailer.createTransport({
@@ -291,6 +292,37 @@ const adminController = {
     } catch (error) {
       console.error('Erreur lors de la création du manager:', error);
       res.status(500).json({ message: 'Erreur lors de l\'envoi de l\'invitation' });
+    }
+  },
+
+  // Supprimer un utilisateur
+  deleteUser: async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      // Vérifier que l'utilisateur existe
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'Utilisateur non trouvé' });
+      }
+
+      // Empêcher la suppression d'un admin
+      if (user.role === 'admin') {
+        return res.status(403).json({ message: 'Impossible de supprimer un administrateur' });
+      }
+
+      // Supprimer l'utilisateur
+      await User.findByIdAndDelete(userId);
+
+      // Si c'est un professeur, supprimer aussi ses disponibilités
+      if (user.role === 'teacher') {
+        await TeacherAvailability.deleteMany({ teacherId: userId });
+      }
+
+      res.json({ message: 'Utilisateur supprimé avec succès' });
+    } catch (error) {
+      console.error('Erreur lors de la suppression:', error);
+      res.status(500).json({ message: 'Erreur lors de la suppression de l\'utilisateur' });
     }
   }
 };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import TeachersList from './manager/TeachersList';
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
@@ -247,6 +248,15 @@ const ManagerDashboard = () => {
         </div>
       </div>
     );
+  };
+
+  const renderContent = () => {
+    switch (activeSection) {
+      case 'teachers':
+        return <TeachersList />;
+      default:
+        return <div>Tableau de bord</div>;
+    }
   };
 
   return (
