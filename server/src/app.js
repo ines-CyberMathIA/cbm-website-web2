@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import userRoutes from './routes/userRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import managerRoutes from './routes/managerRoutes.js';
+import teacherRoutes from './routes/teacherRoutes.js';
 
 dotenv.config();
 
@@ -60,6 +61,7 @@ const startServer = async () => {
     app.use('/api/users', userRoutes);
     app.use('/api/admin', adminRoutes);
     app.use('/api/manager', managerRoutes);
+    app.use('/api/teacher', teacherRoutes);
     
     // Route de test
     app.get('/api/health', (req, res) => {

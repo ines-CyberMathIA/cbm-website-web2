@@ -14,27 +14,61 @@ const Calendar = () => {
     startTime: '08:00',
     endTime: '09:00'
   });
+  const [saveStatus, setSaveStatus] = useState('');
+  const [unsavedAvailabilities, setUnsavedAvailabilities] = useState([]);
 
   const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
   const hours = Array.from({ length: 17 }, (_, i) => `${(i + 6).toString().padStart(2, '0')}:00`);
 
-  // Charger les disponibilités existantes
+  // Charger les disponibilités sauvegardées au montage
   useEffect(() => {
     const fetchAvailabilities = async () => {
       try {
+        setLoading(true);
         const response = await axios.get('http://localhost:5003/api/teacher/availabilities', {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`
           }
         });
         setAvailabilities(response.data);
+        setUnsavedAvailabilities([]);
       } catch (error) {
         console.error('Erreur lors du chargement des disponibilités:', error);
+        setError('Erreur lors du chargement des disponibilités');
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchAvailabilities();
   }, []);
+
+  // Fonction pour sauvegarder les disponibilités
+  const saveAvailabilities = async () => {
+    try {
+      setSaveStatus('saving');
+      const allAvailabilities = [...availabilities, ...unsavedAvailabilities];
+      
+      await axios.post(
+        'http://localhost:5003/api/teacher/availabilities',
+        { availabilities: allAvailabilities },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+      
+      setAvailabilities(allAvailabilities);
+      setUnsavedAvailabilities([]);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(''), 3000);
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error);
+      setError('Erreur lors de la sauvegarde des disponibilités');
+      setSaveStatus('error');
+    }
+  };
 
   // Fonction pour vérifier si une plage horaire respecte la durée minimale
   const isValidDuration = (startTime, endTime) => {
@@ -177,7 +211,7 @@ const Calendar = () => {
       duration: (new Date(`2000-01-01T${endTime}`) - new Date(`2000-01-01T${startTime}`)) / (1000 * 60)
     };
 
-    setAvailabilities([...availabilities, newAvailability]);
+    setUnsavedAvailabilities([...unsavedAvailabilities, newAvailability]);
     setShowAddModal(false);
     setError(null);
   };
@@ -195,14 +229,104 @@ const Calendar = () => {
     setNewSlot(updatedSlot);
   };
 
-  // Modification de la fonction qui vérifie les disponibilités dans la grille
+  // Modification de la fonction qui vérifie les disponibilités
   const hasAvailabilityAtTime = (day, time) => {
-    return availabilities.some(a => 
+    const savedAvailability = availabilities.some(a => 
       a.day === day && 
       a.startTime <= time &&
-      a.endTime > time && 
-      a.endTime <= '22:00' // Ajouter cette condition
+      a.endTime > time
     );
+
+    const unsavedAvailability = unsavedAvailabilities.some(a => 
+      a.day === day && 
+      a.startTime <= time &&
+      a.endTime > time
+    );
+
+    return { saved: savedAvailability, unsaved: unsavedAvailability };
+  };
+
+  // Fonction pour vérifier si la suppression d'un créneau est valide
+  const canDeleteTimeSlot = (day, time) => {
+    // Récupérer toutes les disponibilités du jour
+    const dayAvailabilities = [...availabilities, ...unsavedAvailabilities]
+      .filter(a => a.day === day)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+    // Trouver le créneau qui contient l'heure à supprimer
+    const currentSlot = dayAvailabilities.find(a => 
+      a.startTime <= time && a.endTime > time
+    );
+
+    if (!currentSlot) return false;
+
+    // Simuler la division du créneau
+    const remainingSlots = [];
+    if (currentSlot.startTime < time) {
+      remainingSlots.push({
+        ...currentSlot,
+        endTime: time
+      });
+    }
+    if (currentSlot.endTime > addMinutes(time, 30)) {
+      remainingSlots.push({
+        ...currentSlot,
+        startTime: addMinutes(time, 30)
+      });
+    }
+
+    // Vérifier que chaque partie restante respecte la durée minimale
+    return remainingSlots.every(slot => {
+      const duration = (new Date(`2000-01-01T${slot.endTime}`) - new Date(`2000-01-01T${slot.startTime}`)) / (1000 * 60);
+      return duration >= 90;
+    });
+  };
+
+  // Fonction pour supprimer un créneau
+  const handleDeleteTimeSlot = (day, time) => {
+    if (!canDeleteTimeSlot(day, time)) {
+      setError("La suppression de ce créneau créerait une plage horaire inférieure à 1h30");
+      return;
+    }
+
+    // Trouver le créneau à modifier
+    const existingSlot = [...availabilities, ...unsavedAvailabilities].find(a => 
+      a.day === day && a.startTime <= time && a.endTime > time
+    );
+
+    if (!existingSlot) return;
+
+    // Créer les nouveaux créneaux après la division
+    const newSlots = [];
+    if (existingSlot.startTime < time) {
+      newSlots.push({
+        ...existingSlot,
+        endTime: time
+      });
+    }
+    if (existingSlot.endTime > addMinutes(time, 30)) {
+      newSlots.push({
+        ...existingSlot,
+        startTime: addMinutes(time, 30)
+      });
+    }
+
+    // Mettre à jour les disponibilités
+    const updatedAvailabilities = [...availabilities, ...unsavedAvailabilities]
+      .filter(a => a.id !== existingSlot.id)
+      .concat(newSlots);
+
+    // Si le créneau original était sauvegardé, marquer les nouveaux comme non sauvegardés
+    if (availabilities.some(a => a.id === existingSlot.id)) {
+      setAvailabilities(availabilities.filter(a => a.id !== existingSlot.id));
+      setUnsavedAvailabilities([...unsavedAvailabilities, ...newSlots]);
+    } else {
+      setUnsavedAvailabilities(updatedAvailabilities.filter(a => 
+        !availabilities.some(saved => saved.id === a.id)
+      ));
+    }
+
+    setError(null);
   };
 
   return (
@@ -224,20 +348,21 @@ const Calendar = () => {
           </button>
         </div>
         <div className="flex items-center space-x-4">
+          {saveStatus === 'saving' && (
+            <span className="text-gray-600">Sauvegarde en cours...</span>
+          )}
+          {saveStatus === 'saved' && (
+            <span className="text-green-600">Sauvegardé ✓</span>
+          )}
+          {saveStatus === 'error' && (
+            <span className="text-red-600">Erreur de sauvegarde !</span>
+          )}
           <button
-            onClick={() => setSelectedDate(new Date(selectedDate.setDate(selectedDate.getDate() - 7)))}
-            className="p-2 hover:bg-gray-100 rounded-full"
+            onClick={saveAvailabilities}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            disabled={saveStatus === 'saving'}
           >
-            ←
-          </button>
-          <span className="font-medium">
-            {selectedDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-          </span>
-          <button
-            onClick={() => setSelectedDate(new Date(selectedDate.setDate(selectedDate.getDate() + 7)))}
-            className="p-2 hover:bg-gray-100 rounded-full"
-          >
-            →
+            Sauvegarder
           </button>
         </div>
       </div>
@@ -256,11 +381,11 @@ const Calendar = () => {
         <div className="overflow-y-auto max-h-[600px]">
           {timeSlots.map(time => (
             <div key={time} className="grid grid-cols-8 border-b last:border-b-0">
-              <div className="border-r p-2 text-sm font-medium text-gray-500 bg-gray-50">
-                {time}
+              <div className="border-r p-2 text-sm font-medium bg-gray-100 text-gray-700 flex items-center justify-center">
+                {time.replace(':', 'h')}
               </div>
               {days.map(day => {
-                const hasAvailability = hasAvailabilityAtTime(day, time);
+                const availability = hasAvailabilityAtTime(day, time);
                 const hasCourse = courses.some(c => 
                   c.day === day && 
                   c.startTime <= time &&
@@ -270,16 +395,39 @@ const Calendar = () => {
                 return (
                   <div
                     key={`${day}-${time}`}
-                    className={`border-r last:border-r-0 p-2 min-h-[30px] ${
-                      hasCourse
-                        ? 'bg-blue-50'
-                        : hasAvailability
-                        ? 'bg-green-50'
-                        : ''
-                    }`}
+                    className={`
+                      border-r last:border-r-0 p-2 min-h-[40px] transition-all duration-200
+                      relative group
+                      ${hasCourse 
+                        ? 'bg-blue-100 shadow-inner' 
+                        : availability.saved
+                          ? 'bg-emerald-100 hover:bg-emerald-200 border-l-4 border-emerald-500 shadow-md'
+                          : availability.unsaved
+                            ? 'bg-emerald-50 hover:bg-emerald-100'
+                            : 'hover:bg-gray-50'
+                      }
+                    `}
+                    title={
+                      availability.saved 
+                        ? "Créneau disponible (sauvegardé)" 
+                        : availability.unsaved 
+                          ? "Créneau disponible (non sauvegardé)"
+                          : ""
+                    }
                   >
+                    {(availability.saved || availability.unsaved) && !hasCourse && (
+                      <button
+                        onClick={() => handleDeleteTimeSlot(day, time)}
+                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded-full hover:bg-red-100"
+                        title="Supprimer ce créneau"
+                      >
+                        <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
                     {hasCourse && (
-                      <div className="text-xs bg-blue-100 rounded p-1">
+                      <div className="text-xs bg-blue-200 text-blue-800 rounded-lg px-2 py-1 shadow-sm font-medium">
                         Cours réservé
                       </div>
                     )}
@@ -362,19 +510,25 @@ const Calendar = () => {
 
       {/* Légende */}
       <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="font-medium mb-2">Légende</h3>
-        <div className="flex flex-wrap gap-4">
+        <h3 className="font-medium mb-3 text-gray-700">Légende</h3>
+        <div className="flex flex-wrap gap-6">
           <div className="flex items-center">
-            <div className="w-4 h-4 bg-white border rounded mr-2"></div>
-            <span className="text-sm">Non disponible</span>
+            <div className="w-6 h-6 bg-white border rounded-md mr-2"></div>
+            <span className="text-sm text-gray-600">Non disponible</span>
           </div>
           <div className="flex items-center">
-            <div className="w-4 h-4 bg-green-50 rounded mr-2"></div>
-            <span className="text-sm">Disponible</span>
+            <div className="w-6 h-6 bg-emerald-50 rounded-md mr-2"></div>
+            <span className="text-sm text-gray-600">Disponible (non sauvegardé)</span>
           </div>
           <div className="flex items-center">
-            <div className="w-4 h-4 bg-blue-50 rounded mr-2"></div>
-            <span className="text-sm">Cours réservé</span>
+            <div className="w-6 h-6 bg-emerald-100 rounded-md mr-2 border-l-4 border-emerald-500 shadow-sm"></div>
+            <span className="text-sm text-gray-600">Disponible (sauvegardé)</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-6 h-6 bg-blue-100 rounded-md mr-2 shadow-sm">
+              <div className="text-[8px] text-center text-blue-800 font-medium">Cours</div>
+            </div>
+            <span className="text-sm text-gray-600">Cours réservé</span>
           </div>
         </div>
       </div>
