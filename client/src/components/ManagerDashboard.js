@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import TeachersList from './manager/TeachersList';
@@ -8,81 +8,177 @@ import { Fragment } from 'react';
 const ManagerDashboard = () => {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user'));
+  const [activeSection, setActiveSection] = useState('teachers');
   const [showTeacherModal, setShowTeacherModal] = useState(false);
-  const [showTeacherDetails, setShowTeacherDetails] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
-  const [teacherAvailabilities, setTeacherAvailabilities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Vérification de l'authentification manager
-  useEffect(() => {
-    if (!user || user.role !== 'manager') {
-      navigate('/login');
-    }
-  }, [navigate, user]);
-
-  // Fonction pour charger les disponibilités d'un professeur
-  const loadTeacherAvailabilities = async (teacherId) => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`http://localhost:5000/api/teacher/${teacherId}/availabilities`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      console.log('Disponibilités chargées:', response.data);
-      setTeacherAvailabilities(response.data);
-    } catch (error) {
-      console.error('Erreur lors du chargement des disponibilités:', error);
-      setError('Impossible de charger les disponibilités');
-    } finally {
-      setLoading(false);
-    }
+  // Gestion de la sélection d'un professeur
+  const handleTeacherClick = (teacher) => {
+    setSelectedTeacher(teacher);
+    setActiveSection('teacherDetails');
   };
 
-  // Fonction pour ouvrir les détails d'un professeur
-  const handleTeacherClick = async (teacher) => {
-    console.log('Professeur sélectionné:', teacher);
-    if (teacher.status === 'active') {
-      setSelectedTeacher(teacher);
-      await loadTeacherAvailabilities(teacher._id);
-      setShowTeacherDetails(true);
-    }
+  // Composant pour afficher les détails d'un professeur
+  const TeacherDetails = () => {
+    if (!selectedTeacher) return null;
+
+    return (
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">
+            Détails du professeur
+          </h2>
+          <button
+            onClick={() => {
+              setSelectedTeacher(null);
+              setActiveSection('teachers');
+            }}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
+          <div className="col-span-2 md:col-span-1">
+            <div className="bg-gray-50 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Informations personnelles</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Nom complet</label>
+                  <p className="mt-1 text-gray-900">{selectedTeacher.firstName} {selectedTeacher.lastName}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Email</label>
+                  <p className="mt-1 text-gray-900">{selectedTeacher.email}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Spécialité</label>
+                  <p className="mt-1 text-gray-900">{selectedTeacher.speciality}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Niveaux</label>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {selectedTeacher.level?.map((level) => (
+                      <span
+                        key={level}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
+                      >
+                        {level}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-span-2 md:col-span-1">
+            <div className="bg-gray-50 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Statistiques</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <div className="text-sm font-medium text-gray-500">Cours donnés</div>
+                  <div className="mt-1 text-2xl font-semibold text-indigo-600">0</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <div className="text-sm font-medium text-gray-500">Élèves actifs</div>
+                  <div className="mt-1 text-2xl font-semibold text-indigo-600">0</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <div className="text-sm font-medium text-gray-500">Heures de cours</div>
+                  <div className="mt-1 text-2xl font-semibold text-indigo-600">0h</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <div className="text-sm font-medium text-gray-500">Note moyenne</div>
+                  <div className="mt-1 text-2xl font-semibold text-indigo-600">-</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="py-10">
-        <header>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h1 className="text-3xl font-bold leading-tight text-gray-900">
-              Dashboard Manager
-            </h1>
-          </div>
-        </header>
-        <main>
-          <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            {/* Section des actions */}
-            <div className="px-4 py-6 sm:px-0">
-              <div className="flex justify-end mb-6">
-                <button
-                  onClick={() => setShowTeacherModal(true)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  Inviter un professeur
-                </button>
-              </div>
-
-              {/* Liste des professeurs */}
-              <div className="bg-white shadow rounded-lg">
-                <TeachersList onTeacherClick={handleTeacherClick} />
+      {/* Navbar */}
+      <nav className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex">
+              <div className="flex-shrink-0 flex items-center">
+                <span className="text-2xl font-bold text-indigo-600">CyberMathIA</span>
               </div>
             </div>
+            <div className="flex items-center">
+              <span className="text-gray-700 mr-4">
+                {user?.firstName} {user?.lastName}
+              </span>
+              <button
+                onClick={() => {
+                  localStorage.clear();
+                  navigate('/login');
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                Déconnexion
+              </button>
+            </div>
           </div>
-        </main>
+        </div>
+      </nav>
+
+      <div className="flex">
+        {/* Sidebar */}
+        <div className="w-64 bg-white h-[calc(100vh-4rem)] shadow-sm">
+          <div className="p-4">
+            <button
+              onClick={() => setShowTeacherModal(true)}
+              className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+              </svg>
+              Créer un professeur
+            </button>
+          </div>
+
+          <nav className="mt-4">
+            <button
+              onClick={() => {
+                setActiveSection('teachers');
+                setSelectedTeacher(null);
+              }}
+              className={`w-full flex items-center px-4 py-2 text-sm font-medium ${
+                activeSection === 'teachers'
+                  ? 'bg-indigo-50 text-indigo-600'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <svg className="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+              </svg>
+              Liste des professeurs
+            </button>
+          </nav>
+        </div>
+
+        {/* Contenu principal */}
+        <div className="flex-1 p-8">
+          {activeSection === 'teachers' && (
+            <TeachersList onTeacherClick={handleTeacherClick} />
+          )}
+          {activeSection === 'teacherDetails' && <TeacherDetails />}
+        </div>
       </div>
 
-      {/* Modal pour créer un professeur */}
+      {/* Modal de création de professeur */}
       {showTeacherModal && (
         <TeacherModal
           onClose={() => setShowTeacherModal(false)}
@@ -90,113 +186,6 @@ const ManagerDashboard = () => {
           setLoading={setLoading}
         />
       )}
-
-      {/* Modal des détails du professeur */}
-      <Transition appear show={showTeacherDetails} as={Fragment}>
-        <Dialog
-          as="div"
-          className="relative z-10"
-          onClose={() => setShowTeacherDetails(false)}
-        >
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-black bg-opacity-25" />
-          </Transition.Child>
-
-          <div className="fixed inset-0 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4 text-center">
-              <Transition.Child
-                as={Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0 scale-95"
-                enterTo="opacity-100 scale-100"
-                leave="ease-in duration-200"
-                leaveFrom="opacity-100 scale-100"
-                leaveTo="opacity-0 scale-95"
-              >
-                <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
-                  {selectedTeacher && (
-                    <>
-                      <Dialog.Title
-                        as="h3"
-                        className="text-lg font-medium leading-6 text-gray-900 mb-4"
-                      >
-                        Détails du professeur
-                      </Dialog.Title>
-                      
-                      {/* Informations du professeur */}
-                      <div className="mb-6">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-500">Nom complet</h4>
-                            <p className="mt-1 text-sm text-gray-900">
-                              {selectedTeacher.firstName} {selectedTeacher.lastName}
-                            </p>
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-500">Email</h4>
-                            <p className="mt-1 text-sm text-gray-900">{selectedTeacher.email}</p>
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-500">Spécialité</h4>
-                            <p className="mt-1 text-sm text-gray-900">{selectedTeacher.speciality}</p>
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-500">Niveaux</h4>
-                            <p className="mt-1 text-sm text-gray-900">
-                              {selectedTeacher.level?.join(', ')}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Disponibilités */}
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-500 mb-2">Disponibilités</h4>
-                        {teacherAvailabilities.length > 0 ? (
-                          <div className="border rounded-lg divide-y">
-                            {teacherAvailabilities.map((availability, index) => (
-                              <div key={index} className="p-3">
-                                <div className="flex justify-between items-center">
-                                  <span className="font-medium">{availability.day}</span>
-                                  <span className="text-sm text-gray-500">
-                                    {availability.startTime} - {availability.endTime}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-500 italic">
-                            Aucune disponibilité définie
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="mt-6 flex justify-end">
-                        <button
-                          type="button"
-                          className="inline-flex justify-center rounded-md border border-transparent bg-indigo-100 px-4 py-2 text-sm font-medium text-indigo-900 hover:bg-indigo-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-                          onClick={() => setShowTeacherDetails(false)}
-                        >
-                          Fermer
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </Dialog.Panel>
-              </Transition.Child>
-            </div>
-          </div>
-        </Dialog>
-      </Transition>
     </div>
   );
 };
