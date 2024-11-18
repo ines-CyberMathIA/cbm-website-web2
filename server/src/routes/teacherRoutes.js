@@ -1,5 +1,6 @@
 import express from 'express';
 import TeacherAvailability from '../models/TeacherAvailability.js';
+import Message from '../models/Message.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -9,7 +10,7 @@ router.get('/availabilities', authMiddleware, async (req, res) => {
   try {
     console.log('Récupération des disponibilités pour le professeur:', req.user._id);
     const availabilities = await TeacherAvailability.find({ teacherId: req.user._id });
-    console.log('Disponibilités trouvées:', availabilities.length);
+    console.log('Disponibilités trouvées:', availabilities);
     res.json(availabilities);
   } catch (error) {
     console.error('Erreur lors de la récupération des disponibilités:', error);
@@ -51,6 +52,67 @@ router.post('/availabilities', authMiddleware, async (req, res) => {
       message: 'Erreur serveur',
       error: error.message 
     });
+  }
+});
+
+// Récupérer les messages avec le manager
+router.get('/messages', authMiddleware, async (req, res) => {
+  try {
+    // Trouver le manager associé au professeur
+    const messages = await Message.find({
+      $or: [
+        { sender: req.user._id },
+        { receiver: req.user._id }
+      ]
+    })
+    .sort({ createdAt: 1 })
+    .populate('sender', 'firstName lastName role')
+    .populate('receiver', 'firstName lastName role');
+
+    res.json(messages);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des messages:', error);
+    res.status(500).json({ message: 'Erreur lors de la récupération des messages' });
+  }
+});
+
+// Envoyer un message au manager
+router.post('/messages/:managerId', authMiddleware, async (req, res) => {
+  try {
+    const { managerId } = req.params;
+    const { content } = req.body;
+
+    const message = new Message({
+      sender: req.user._id,
+      receiver: managerId,
+      content
+    });
+
+    await message.save();
+    
+    const populatedMessage = await Message.findById(message._id)
+      .populate('sender', 'firstName lastName role')
+      .populate('receiver', 'firstName lastName role');
+
+    res.status(201).json(populatedMessage);
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi du message:', error);
+    res.status(500).json({ message: 'Erreur lors de l\'envoi du message' });
+  }
+});
+
+// Marquer les messages comme lus
+router.put('/messages/:managerId/read', authMiddleware, async (req, res) => {
+  try {
+    const { managerId } = req.params;
+    await Message.updateMany(
+      { sender: managerId, receiver: req.user._id, read: false },
+      { read: true }
+    );
+    res.json({ message: 'Messages marqués comme lus' });
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour des messages:', error);
+    res.status(500).json({ message: 'Erreur lors de la mise à jour des messages' });
   }
 });
 
