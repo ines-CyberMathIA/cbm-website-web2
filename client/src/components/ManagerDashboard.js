@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import TeachersList from './manager/TeachersList';
@@ -22,7 +22,103 @@ const ManagerDashboard = () => {
 
   // Composant pour afficher les détails d'un professeur
   const TeacherDetails = () => {
+    const [availabilities, setAvailabilities] = useState([]);
+    
+    useEffect(() => {
+      const fetchAvailabilities = async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await axios.get(
+            `http://localhost:5000/api/manager/teacher/${selectedTeacher._id}/availabilities`,
+            {
+              headers: { Authorization: `Bearer ${token}` }
+            }
+          );
+          console.log('Disponibilités reçues:', response.data);
+          setAvailabilities(response.data);
+        } catch (error) {
+          console.error('Erreur lors du chargement des disponibilités:', error);
+        }
+      };
+
+      if (selectedTeacher) {
+        fetchAvailabilities();
+      }
+    }, [selectedTeacher]);
+
     if (!selectedTeacher) return null;
+
+    // Fonction pour formater les horaires
+    const formatTimeSlots = (availabilities) => {
+      const slots = {};
+      availabilities.forEach(slot => {
+        if (!slots[slot.day]) {
+          slots[slot.day] = [];
+        }
+        slots[slot.day].push(`${slot.startTime} - ${slot.endTime}`);
+      });
+      return slots;
+    };
+
+    const timeSlots = formatTimeSlots(availabilities);
+
+    const WeeklyCalendar = ({ availabilities }) => {
+      const hours = Array.from({ length: 32 }, (_, i) => {
+        const hour = Math.floor(i / 2) + 6;
+        const minutes = i % 2 === 0 ? '00' : '30';
+        return `${hour.toString().padStart(2, '0')}:${minutes}`;
+      });
+
+      const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+
+      const isAvailable = (day, time) => {
+        return availabilities.some(slot => {
+          const slotStart = slot.startTime;
+          const slotEnd = slot.endTime;
+          return slot.day === day && time >= slotStart && time < slotEnd;
+        });
+      };
+
+      return (
+        <div className="overflow-x-auto">
+          <div className="min-w-[800px]">
+            {/* En-tête des jours */}
+            <div className="grid grid-cols-8 bg-gray-50" style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)' }}>
+              <div className="border-b border-r border-gray-200 bg-gray-50 h-10 flex items-center justify-center"></div>
+              {days.map(day => (
+                <div
+                  key={day}
+                  className="border-b border-r border-gray-200 h-10 flex items-center justify-center font-medium text-gray-700"
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Grille des horaires */}
+            <div className="relative">
+              {hours.map((time) => (
+                <div key={time} className="grid" style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)' }}>
+                  <div className="border-b border-r border-gray-200 bg-gray-50 h-8 flex items-center justify-center text-xs text-gray-500">
+                    {time}
+                  </div>
+                  {days.map(day => (
+                    <div
+                      key={`${day}-${time}`}
+                      className={`border-b border-r border-gray-200 h-8 ${
+                        isAvailable(day, time)
+                          ? 'bg-green-100'
+                          : 'bg-white'
+                      }`}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    };
 
     return (
       <div className="bg-white rounded-lg shadow-lg p-6">
@@ -97,6 +193,26 @@ const ManagerDashboard = () => {
                   <div className="text-sm font-medium text-gray-500">Note moyenne</div>
                   <div className="mt-1 text-2xl font-semibold text-indigo-600">-</div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section du calendrier */}
+        <div className="mt-6">
+          <div className="bg-gray-50 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Horaires disponibles</h3>
+            <div className="bg-white rounded-lg shadow">
+              <WeeklyCalendar availabilities={availabilities} />
+            </div>
+            <div className="mt-4 flex items-center text-sm text-gray-600">
+              <div className="flex items-center mr-4">
+                <div className="w-3 h-3 bg-green-100 border border-green-500 rounded mr-2"></div>
+                <span>Disponible</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-white border border-gray-200 rounded mr-2"></div>
+                <span>Non disponible</span>
               </div>
             </div>
           </div>
@@ -199,6 +315,7 @@ const TeacherModal = ({ onClose, setError, setLoading }) => {
     speciality: 'mathematics',
     level: ['college']
   });
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -221,6 +338,7 @@ const TeacherModal = ({ onClose, setError, setLoading }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
     setLoading(true);
 
     try {
@@ -229,71 +347,86 @@ const TeacherModal = ({ onClose, setError, setLoading }) => {
         'http://localhost:5000/api/manager/create-teacher',
         formData,
         {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+          headers: { Authorization: `Bearer ${token}` }
         }
       );
-
       onClose();
-      window.location.reload(); // Rafraîchir la page pour voir le nouveau professeur
+      window.location.reload();
     } catch (error) {
-      console.error('Erreur détaillée:', error.response?.data || error);
       setError(error.response?.data?.message || 'Erreur lors de la création du professeur');
     } finally {
+      setIsLoading(false);
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
-      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div className="mt-3">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">
-            Inviter un nouveau professeur
-          </h3>
-          <form onSubmit={handleSubmit} className="mt-4">
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700">Prénom</label>
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex justify-center items-center z-50">
+      <div className="bg-white w-full max-w-3xl rounded-xl shadow-2xl">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-gray-900">Créer un nouveau professeur</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Prénom
+              </label>
               <input
                 type="text"
                 name="firstName"
                 value={formData.firstName}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 required
               />
             </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700">Nom</label>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nom
+              </label>
               <input
                 type="text"
                 name="lastName"
                 value={formData.lastName}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 required
               />
             </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700">Email</label>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email
+              </label>
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 required
               />
             </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700">Spécialité</label>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Spécialité
+              </label>
               <select
                 name="speciality"
                 value={formData.speciality}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
                 <option value="mathematics">Mathématiques</option>
                 <option value="physics">Physique</option>
@@ -302,43 +435,47 @@ const TeacherModal = ({ onClose, setError, setLoading }) => {
                 <option value="computer_science">Informatique</option>
               </select>
             </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700">Niveaux</label>
-              <div className="mt-2 space-y-2">
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Niveaux d'enseignement
+              </label>
+              <div className="space-y-2">
                 {['college', 'lycee', 'superieur', 'adulte'].map((level) => (
-                  <div key={level} className="flex items-center">
+                  <label key={level} className="flex items-center space-x-2">
                     <input
                       type="checkbox"
-                      id={level}
                       value={level}
                       checked={formData.level.includes(level)}
                       onChange={handleLevelChange}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
-                    <label htmlFor={level} className="ml-2 text-sm text-gray-700">
+                    <span className="text-sm text-gray-700">
                       {level.charAt(0).toUpperCase() + level.slice(1)}
-                    </label>
-                  </div>
+                    </span>
+                  </label>
                 ))}
               </div>
             </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700"
-              >
-                Inviter
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+
+          <div className="mt-6 flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {isLoading ? 'Création...' : 'Créer le professeur'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
