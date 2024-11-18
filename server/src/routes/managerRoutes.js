@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import PendingTeacher from '../models/PendingTeacher.js';
 import TeacherAvailability from '../models/TeacherAvailability.js';
+import Message from '../models/Message.js';
 
 const router = express.Router();
 
@@ -321,6 +322,62 @@ router.get('/teacher/:teacherId/availabilities', authMiddleware, async (req, res
   } catch (error) {
     console.error('Erreur lors de la récupération des disponibilités:', error);
     res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Récupérer les messages avec un professeur
+router.get('/messages/:teacherId', authMiddleware, async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    const messages = await Message.find({
+      $or: [
+        { sender: req.user._id, receiver: teacherId },
+        { sender: teacherId, receiver: req.user._id }
+      ]
+    })
+    .sort({ createdAt: 1 })
+    .populate('sender', 'firstName lastName role');
+
+    res.json(messages);
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur lors de la récupération des messages' });
+  }
+});
+
+// Envoyer un message à un professeur
+router.post('/messages/:teacherId', authMiddleware, async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    const { content } = req.body;
+
+    const message = new Message({
+      sender: req.user._id,
+      receiver: teacherId,
+      content
+    });
+
+    await message.save();
+    
+    const populatedMessage = await Message.findById(message._id)
+      .populate('sender', 'firstName lastName role');
+
+    res.status(201).json(populatedMessage);
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur lors de l\'envoi du message' });
+  }
+});
+
+// Marquer les messages comme lus
+router.put('/messages/:teacherId/read', authMiddleware, async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    await Message.updateMany(
+      { sender: teacherId, receiver: req.user._id, read: false },
+      { read: true }
+    );
+    res.json({ message: 'Messages marqués comme lus' });
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur lors de la mise à jour des messages' });
   }
 });
 

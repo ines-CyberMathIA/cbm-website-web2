@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import TeachersList from './manager/TeachersList';
+import MessagesSection from './manager/MessagesSection';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 
@@ -120,6 +121,109 @@ const ManagerDashboard = () => {
       );
     };
 
+    const Chat = ({ teacherId }) => {
+      const [messages, setMessages] = useState([]);
+      const [newMessage, setNewMessage] = useState('');
+      const [loading, setLoading] = useState(false);
+      const messagesEndRef = useRef(null);
+      const user = JSON.parse(localStorage.getItem('user'));
+
+      const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      };
+
+      useEffect(() => {
+        const fetchMessages = async () => {
+          try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get(
+              `http://localhost:5000/api/manager/messages/${teacherId}`,
+              {
+                headers: { Authorization: `Bearer ${token}` }
+              }
+            );
+            setMessages(response.data);
+            scrollToBottom();
+          } catch (error) {
+            console.error('Erreur lors de la récupération des messages:', error);
+          }
+        };
+
+        fetchMessages();
+        // Mettre en place un polling toutes les 5 secondes
+        const interval = setInterval(fetchMessages, 5000);
+        return () => clearInterval(interval);
+      }, [teacherId]);
+
+      const handleSendMessage = async (e) => {
+        e.preventDefault();
+        if (!newMessage.trim()) return;
+
+        setLoading(true);
+        try {
+          const token = localStorage.getItem('token');
+          const response = await axios.post(
+            `http://localhost:5000/api/manager/messages/${teacherId}`,
+            { content: newMessage },
+            {
+              headers: { Authorization: `Bearer ${token}` }
+            }
+          );
+          setMessages([...messages, response.data]);
+          setNewMessage('');
+          scrollToBottom();
+        } catch (error) {
+          console.error('Erreur lors de l\'envoi du message:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div className="bg-white rounded-lg shadow-lg p-4 h-[500px] flex flex-col">
+          <div className="flex-1 overflow-y-auto mb-4 space-y-4">
+            {messages.map((message) => (
+              <div
+                key={message._id}
+                className={`flex ${message.sender._id === user.id ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                    message.sender._id === user.id
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-100 text-gray-900'
+                  }`}
+                >
+                  <p className="text-sm">{message.content}</p>
+                  <p className="text-xs mt-1 opacity-75">
+                    {new Date(message.createdAt).toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <form onSubmit={handleSendMessage} className="flex gap-2">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Écrivez votre message..."
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            <button
+              type="submit"
+              disabled={loading || !newMessage.trim()}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {loading ? 'Envoi...' : 'Envoyer'}
+            </button>
+          </form>
+        </div>
+      );
+    };
+
     return (
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex justify-between items-center mb-6">
@@ -217,6 +321,14 @@ const ManagerDashboard = () => {
             </div>
           </div>
         </div>
+
+        {/* Section chat */}
+        <div className="mt-6">
+          <div className="bg-gray-50 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Chat avec {selectedTeacher.firstName}</h3>
+            <Chat teacherId={selectedTeacher._id} />
+          </div>
+        </div>
       </div>
     );
   };
@@ -282,6 +394,22 @@ const ManagerDashboard = () => {
               </svg>
               Liste des professeurs
             </button>
+            <button
+              onClick={() => {
+                setActiveSection('messages');
+                setSelectedTeacher(null);
+              }}
+              className={`w-full flex items-center px-4 py-2 text-sm font-medium ${
+                activeSection === 'messages'
+                  ? 'bg-indigo-50 text-indigo-600'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <svg className="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              Messages
+            </button>
           </nav>
         </div>
 
@@ -291,6 +419,7 @@ const ManagerDashboard = () => {
             <TeachersList onTeacherClick={handleTeacherClick} />
           )}
           {activeSection === 'teacherDetails' && <TeacherDetails />}
+          {activeSection === 'messages' && <MessagesSection />}
         </div>
       </div>
 
