@@ -198,6 +198,7 @@ const adminController = {
   // Récupérer les statistiques
   getStats: async (req, res) => {
     try {
+      console.log('Récupération des statistiques...');
       const stats = {
         totalUsers: await User.countDocuments(),
         totalTeachers: await User.countDocuments({ role: 'teacher' }),
@@ -205,6 +206,7 @@ const adminController = {
         totalParents: await User.countDocuments({ role: 'parent' }),
         totalManagers: await User.countDocuments({ role: 'manager' })
       };
+      console.log('Statistiques récupérées:', stats);
       res.json(stats);
     } catch (error) {
       console.error('Erreur de récupération des stats:', error);
@@ -229,14 +231,16 @@ const adminController = {
   getUsersByRole: async (req, res) => {
     try {
       const { role } = req.params;
-      let users;
+      console.log('Récupération des utilisateurs pour le rôle:', role);
       
+      let users;
       if (role === 'all') {
         users = await User.find({}).sort({ createdAt: -1 });
       } else {
         users = await User.find({ role }).sort({ createdAt: -1 });
       }
 
+      console.log(`Nombre d'utilisateurs trouvés: ${users.length}`);
       res.json(users);
     } catch (error) {
       console.error('Erreur lors de la récupération des utilisateurs:', error);
@@ -299,30 +303,38 @@ const adminController = {
   deleteUser: async (req, res) => {
     try {
       const { userId } = req.params;
+      console.log('Tentative de suppression de l\'utilisateur:', userId);
 
       // Vérifier que l'utilisateur existe
       const user = await User.findById(userId);
       if (!user) {
+        console.log('Utilisateur non trouvé');
         return res.status(404).json({ message: 'Utilisateur non trouvé' });
       }
 
       // Empêcher la suppression d'un admin
       if (user.role === 'admin') {
+        console.log('Tentative de suppression d\'un admin bloquée');
         return res.status(403).json({ message: 'Impossible de supprimer un administrateur' });
+      }
+
+      // Si c'est un professeur, supprimer aussi ses disponibilités
+      if (user.role === 'teacher') {
+        console.log('Suppression des disponibilités du professeur');
+        await TeacherAvailability.deleteMany({ teacherId: userId });
       }
 
       // Supprimer l'utilisateur
       await User.findByIdAndDelete(userId);
-
-      // Si c'est un professeur, supprimer aussi ses disponibilités
-      if (user.role === 'teacher') {
-        await TeacherAvailability.deleteMany({ teacherId: userId });
-      }
+      console.log('Utilisateur supprimé avec succès');
 
       res.json({ message: 'Utilisateur supprimé avec succès' });
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
-      res.status(500).json({ message: 'Erreur lors de la suppression de l\'utilisateur' });
+      res.status(500).json({ 
+        message: 'Erreur lors de la suppression de l\'utilisateur',
+        error: error.message 
+      });
     }
   }
 };

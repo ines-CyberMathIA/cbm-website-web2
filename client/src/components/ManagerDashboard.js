@@ -2,20 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import TeachersList from './manager/TeachersList';
+import { Dialog, Transition } from '@headlessui/react';
+import { Fragment } from 'react';
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user'));
-  const [activeSection, setActiveSection] = useState('overview');
   const [showTeacherModal, setShowTeacherModal] = useState(false);
-  const [stats, setStats] = useState({
-    totalTeachers: 0,
-    activeTeachers: 0,
-    totalSessions: 0,
-    upcomingSessions: 0,
-    averageRating: 0
-  });
-  const [teachers, setTeachers] = useState([]);
+  const [showTeacherDetails, setShowTeacherDetails] = useState(false);
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [teacherAvailabilities, setTeacherAvailabilities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -26,150 +22,290 @@ const ManagerDashboard = () => {
     }
   }, [navigate, user]);
 
-  // Charger la liste des professeurs
-  const fetchTeachers = async () => {
-    setLoading(true);
+  // Fonction pour charger les disponibilités d'un professeur
+  const loadTeacherAvailabilities = async (teacherId) => {
     try {
+      setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5001/api/manager/teachers', {
+      const response = await axios.get(`http://localhost:5000/api/teacher/${teacherId}/availabilities`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setTeachers(response.data);
+      console.log('Disponibilités chargées:', response.data);
+      setTeacherAvailabilities(response.data);
     } catch (error) {
-      console.error('Erreur lors du chargement des professeurs:', error);
+      console.error('Erreur lors du chargement des disponibilités:', error);
+      setError('Impossible de charger les disponibilités');
     } finally {
       setLoading(false);
     }
   };
 
-  // Charger les professeurs au montage du composant
-  useEffect(() => {
-    fetchTeachers();
-  }, []);
+  // Fonction pour ouvrir les détails d'un professeur
+  const handleTeacherClick = async (teacher) => {
+    console.log('Professeur sélectionné:', teacher);
+    if (teacher.status === 'active') {
+      setSelectedTeacher(teacher);
+      await loadTeacherAvailabilities(teacher._id);
+      setShowTeacherDetails(true);
+    }
+  };
 
-  // Modal pour créer un professeur
-  const TeacherModal = () => {
-    const [formData, setFormData] = useState({
-      firstName: '',
-      lastName: '',
-      email: '',
-      speciality: '',
-      level: []
-    });
-
-    const handleChange = (e) => {
-      const { name, value } = e.target;
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    };
-
-    const handleLevelChange = (e) => {
-      const { value, checked } = e.target;
-      setFormData(prev => ({
-        ...prev,
-        level: checked 
-          ? [...prev.level, value]
-          : prev.level.filter(l => l !== value)
-      }));
-    };
-
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      setError('');
-      setLoading(true);
-
-      try {
-        const token = localStorage.getItem('token');
-        await axios.post(
-          'http://localhost:5001/api/manager/create-teacher',
-          formData,
-          {
-            headers: { Authorization: `Bearer ${token}` }
-          }
-        );
-
-        setShowTeacherModal(false);
-        fetchTeachers();  // Rafraîchir la liste des professeurs
-        alert('Un email a été envoyé au professeur pour finaliser son inscription');
-      } catch (error) {
-        setError(error.response?.data?.message || 'Erreur lors de la création du professeur');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
-        <div className="relative top-20 mx-auto p-8 border w-[600px] shadow-2xl rounded-2xl bg-white">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-semibold text-gray-900">Inviter un nouveau professeur</h3>
-            <button
-              onClick={() => setShowTeacherModal(false)}
-              className="text-gray-400 hover:text-gray-500 transition-colors"
-            >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <div className="py-10">
+        <header>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h1 className="text-3xl font-bold leading-tight text-gray-900">
+              Dashboard Manager
+            </h1>
           </div>
-
-          {error && (
-            <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4 rounded">
-              <p className="text-red-700">{error}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
-                <input
-                  type="text"
-                  name="firstName"
-                  required
-                  value={formData.firstName}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                />
+        </header>
+        <main>
+          <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            {/* Section des actions */}
+            <div className="px-4 py-6 sm:px-0">
+              <div className="flex justify-end mb-6">
+                <button
+                  onClick={() => setShowTeacherModal(true)}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Inviter un professeur
+                </button>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
-                <input
-                  type="text"
-                  name="lastName"
-                  required
-                  value={formData.lastName}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                />
+              {/* Liste des professeurs */}
+              <div className="bg-white shadow rounded-lg">
+                <TeachersList onTeacherClick={handleTeacherClick} />
               </div>
             </div>
+          </div>
+        </main>
+      </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+      {/* Modal pour créer un professeur */}
+      {showTeacherModal && (
+        <TeacherModal
+          onClose={() => setShowTeacherModal(false)}
+          setError={setError}
+          setLoading={setLoading}
+        />
+      )}
+
+      {/* Modal des détails du professeur */}
+      <Transition appear show={showTeacherDetails} as={Fragment}>
+        <Dialog
+          as="div"
+          className="relative z-10"
+          onClose={() => setShowTeacherDetails(false)}
+        >
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-25" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                  {selectedTeacher && (
+                    <>
+                      <Dialog.Title
+                        as="h3"
+                        className="text-lg font-medium leading-6 text-gray-900 mb-4"
+                      >
+                        Détails du professeur
+                      </Dialog.Title>
+                      
+                      {/* Informations du professeur */}
+                      <div className="mb-6">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-500">Nom complet</h4>
+                            <p className="mt-1 text-sm text-gray-900">
+                              {selectedTeacher.firstName} {selectedTeacher.lastName}
+                            </p>
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-500">Email</h4>
+                            <p className="mt-1 text-sm text-gray-900">{selectedTeacher.email}</p>
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-500">Spécialité</h4>
+                            <p className="mt-1 text-sm text-gray-900">{selectedTeacher.speciality}</p>
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-500">Niveaux</h4>
+                            <p className="mt-1 text-sm text-gray-900">
+                              {selectedTeacher.level?.join(', ')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Disponibilités */}
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-500 mb-2">Disponibilités</h4>
+                        {teacherAvailabilities.length > 0 ? (
+                          <div className="border rounded-lg divide-y">
+                            {teacherAvailabilities.map((availability, index) => (
+                              <div key={index} className="p-3">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-medium">{availability.day}</span>
+                                  <span className="text-sm text-gray-500">
+                                    {availability.startTime} - {availability.endTime}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500 italic">
+                            Aucune disponibilité définie
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="mt-6 flex justify-end">
+                        <button
+                          type="button"
+                          className="inline-flex justify-center rounded-md border border-transparent bg-indigo-100 px-4 py-2 text-sm font-medium text-indigo-900 hover:bg-indigo-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                          onClick={() => setShowTeacherDetails(false)}
+                        >
+                          Fermer
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+    </div>
+  );
+};
+
+// Composant Modal pour créer un professeur
+const TeacherModal = ({ onClose, setError, setLoading }) => {
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    speciality: 'mathematics',
+    level: ['college']
+  });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleLevelChange = (e) => {
+    const { value, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      level: checked 
+        ? [...prev.level, value]
+        : prev.level.filter(l => l !== value)
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        'http://localhost:5000/api/manager/create-teacher',
+        formData,
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      onClose();
+      window.location.reload(); // Rafraîchir la page pour voir le nouveau professeur
+    } catch (error) {
+      console.error('Erreur détaillée:', error.response?.data || error);
+      setError(error.response?.data?.message || 'Erreur lors de la création du professeur');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div className="mt-3">
+          <h3 className="text-lg leading-6 font-medium text-gray-900">
+            Inviter un nouveau professeur
+          </h3>
+          <form onSubmit={handleSubmit} className="mt-4">
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Prénom</label>
+              <input
+                type="text"
+                name="firstName"
+                value={formData.firstName}
+                onChange={handleChange}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                required
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Nom</label>
+              <input
+                type="text"
+                name="lastName"
+                value={formData.lastName}
+                onChange={handleChange}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                required
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Email</label>
               <input
                 type="email"
                 name="email"
-                required
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                required
               />
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Spécialité</label>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Spécialité</label>
               <select
                 name="speciality"
-                required
                 value={formData.speciality}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               >
-                <option value="">Sélectionner une spécialité</option>
                 <option value="mathematics">Mathématiques</option>
                 <option value="physics">Physique</option>
                 <option value="chemistry">Chimie</option>
@@ -177,146 +313,44 @@ const ManagerDashboard = () => {
                 <option value="computer_science">Informatique</option>
               </select>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Niveaux d'enseignement</label>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="flex items-center">
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Niveaux</label>
+              <div className="mt-2 space-y-2">
+                {['college', 'lycee', 'superieur', 'adulte'].map((level) => (
+                  <div key={level} className="flex items-center">
                     <input
                       type="checkbox"
-                      value="college"
-                      checked={formData.level.includes('college')}
+                      id={level}
+                      value={level}
+                      checked={formData.level.includes(level)}
                       onChange={handleLevelChange}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
-                    <span className="ml-2">Collège</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      value="lycee"
-                      checked={formData.level.includes('lycee')}
-                      onChange={handleLevelChange}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                    />
-                    <span className="ml-2">Lycée</span>
-                  </label>
-                </div>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      value="superieur"
-                      checked={formData.level.includes('superieur')}
-                      onChange={handleLevelChange}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                    />
-                    <span className="ml-2">Supérieur</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      value="adulte"
-                      checked={formData.level.includes('adulte')}
-                      onChange={handleLevelChange}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                    />
-                    <span className="ml-2">Formation adulte</span>
-                  </label>
-                </div>
+                    <label htmlFor={level} className="ml-2 text-sm text-gray-700">
+                      {level.charAt(0).toUpperCase() + level.slice(1)}
+                    </label>
+                  </div>
+                ))}
               </div>
             </div>
-
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
-                onClick={() => setShowTeacherModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
               >
                 Annuler
               </button>
               <button
                 type="submit"
-                disabled={loading}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700"
               >
-                {loading ? 'Envoi...' : 'Inviter le professeur'}
+                Inviter
               </button>
             </div>
           </form>
         </div>
       </div>
-    );
-  };
-
-  const renderContent = () => {
-    switch (activeSection) {
-      case 'teachers':
-        return <TeachersList />;
-      default:
-        return <div>Tableau de bord</div>;
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Navbar */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <span className="text-2xl font-bold text-indigo-600">Manager CyberMathIA</span>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <span className="text-gray-700 mr-4">
-                {user?.firstName} {user?.lastName}
-              </span>
-              <button
-                onClick={() => {
-                  localStorage.clear();
-                  navigate('/login');
-                }}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                Déconnexion
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Contenu principal */}
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* En-tête avec bouton d'action */}
-        <div className="mb-6 flex justify-between items-center">
-          <h1 className="text-2xl font-semibold text-gray-900">Tableau de bord</h1>
-          <button
-            onClick={() => setShowTeacherModal(true)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center"
-          >
-            <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-            </svg>
-            Ajouter un professeur
-          </button>
-        </div>
-
-        {/* Statistiques */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {/* ... Cartes de statistiques ... */}
-        </div>
-
-        {/* Liste des professeurs */}
-        <div className="mt-8">
-          {/* ... Liste des professeurs ... */}
-        </div>
-      </div>
-
-      {/* Modal de création de professeur */}
-      {showTeacherModal && <TeacherModal />}
     </div>
   );
 };

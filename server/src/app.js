@@ -12,73 +12,81 @@ dotenv.config();
 
 const app = express();
 
-// Configuration CORS détaillée
-app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+// Middleware pour parser le JSON
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Configuration CORS spécifique
+const corsOptions = {
+  origin: 'http://localhost:3000',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
 
-app.use(express.json());
+// Appliquer CORS à toutes les routes
+app.use(cors(corsOptions));
 
-// Connection MongoDB avec plus de logs et gestion d'erreurs
+// Middleware pour les erreurs CORS
+app.use((err, req, res, next) => {
+  if (err.name === 'CORSError') {
+    console.error('Erreur CORS:', err);
+    res.status(500).json({ 
+      message: 'Erreur CORS',
+      error: err.message 
+    });
+  } else {
+    next(err);
+  }
+});
+
+// Routes
+app.use('/api/users', userRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/manager', managerRoutes);
+app.use('/api/teacher', teacherRoutes);
+
+// Route de test CORS
+app.options('*', cors(corsOptions));
+app.get('/api/test-cors', cors(corsOptions), (req, res) => {
+  res.json({ message: 'CORS test successful' });
+});
+
+// Connection MongoDB
 const connectDB = async () => {
   try {
     console.log('Tentative de connexion à MongoDB...');
-    console.log('URI:', process.env.MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//<credentials>@'));
-    
-    await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000 // Timeout après 5 secondes
-    });
-    
+    await mongoose.connect(process.env.MONGODB_URI);
     console.log('Connecté à MongoDB avec succès');
-    
-    // Vérifier la connexion
-    const adminDb = mongoose.connection.db.admin();
-    const dbInfo = await adminDb.listDatabases();
-    console.log('Bases de données disponibles:', dbInfo.databases.map(db => db.name));
-    
   } catch (err) {
     console.error('Erreur de connexion MongoDB:', err);
-    console.error('Détails de l\'erreur:', {
-      message: err.message,
-      code: err.code,
-      name: err.name
-    });
     process.exit(1);
   }
 };
 
-// Attendre que MongoDB soit prêt avant de démarrer le serveur
+// Démarrer le serveur
 const startServer = async () => {
   try {
     await connectDB();
+    const PORT = process.env.PORT || 5000;
     
-    // Routes
-    app.use('/api/users', userRoutes);
-    app.use('/api/admin', adminRoutes);
-    app.use('/api/manager', managerRoutes);
-    app.use('/api/teacher', teacherRoutes);
-    
-    // Route de test
-    app.get('/api/health', (req, res) => {
-      res.json({
-        status: 'ok',
-        mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-        timestamp: new Date().toISOString()
-      });
-    });
-    
-    // Démarrer le serveur
-    const PORT = process.env.PORT || 5001;
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`Serveur démarré sur le port ${PORT}`);
       console.log('Environnement:', process.env.NODE_ENV);
+      console.log('CORS Origin:', corsOptions.origin);
     });
-    
+
+    // Gestion des erreurs du serveur
+    server.on('error', (error) => {
+      console.error('Erreur du serveur:', error);
+      if (error.code === 'EADDRINUSE') {
+        console.error(`Le port ${PORT} est déjà utilisé`);
+        process.exit(1);
+      }
+    });
+
   } catch (error) {
     console.error('Erreur au démarrage du serveur:', error);
     process.exit(1);

@@ -161,16 +161,25 @@ router.post('/complete-manager-registration', async (req, res) => {
 router.post('/verify-teacher-token', async (req, res) => {
   try {
     const { token } = req.body;
+    console.log('Token reçu:', token);
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('Token décodé:', decoded);
+
     res.json({
       firstName: decoded.firstName,
       lastName: decoded.lastName,
       email: decoded.email,
       speciality: decoded.speciality,
-      level: decoded.level
+      level: decoded.level,
+      createdBy: decoded.createdBy
     });
   } catch (error) {
-    res.status(401).json({ message: 'Token invalide ou expiré' });
+    console.error('Erreur de vérification du token:', error);
+    res.status(401).json({ 
+      message: 'Token invalide ou expiré',
+      details: error.message 
+    });
   }
 });
 
@@ -178,7 +187,13 @@ router.post('/verify-teacher-token', async (req, res) => {
 router.post('/complete-teacher-registration', async (req, res) => {
   try {
     const { token, password } = req.body;
+    console.log('Finalisation inscription professeur avec token');
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('Données décodées du token:', {
+      ...decoded,
+      createdBy: decoded.createdBy
+    });
 
     // Créer le compte professeur
     const teacher = new User({
@@ -187,15 +202,31 @@ router.post('/complete-teacher-registration', async (req, res) => {
       email: decoded.email,
       password: password,
       role: 'teacher',
-      speciality: decoded.speciality,
-      level: decoded.level
+      speciality: decoded.speciality || 'mathematics',
+      level: decoded.level || ['college'],
+      createdBy: decoded.createdBy
     });
 
-    await teacher.save();
+    console.log('Création du compte professeur avec les données:', {
+      firstName: teacher.firstName,
+      lastName: teacher.lastName,
+      email: teacher.email,
+      role: teacher.role,
+      speciality: teacher.speciality,
+      level: teacher.level,
+      createdBy: teacher.createdBy
+    });
+
+    const savedTeacher = await teacher.save();
+    console.log('Professeur sauvegardé avec succès:', {
+      id: savedTeacher._id,
+      email: savedTeacher.email,
+      createdBy: savedTeacher.createdBy
+    });
 
     // Générer le token de connexion
     const authToken = jwt.sign(
-      { userId: teacher._id, role: 'teacher' },
+      { userId: savedTeacher._id, role: 'teacher' },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
@@ -203,18 +234,22 @@ router.post('/complete-teacher-registration', async (req, res) => {
     res.json({
       token: authToken,
       user: {
-        id: teacher._id,
-        firstName: teacher.firstName,
-        lastName: teacher.lastName,
-        email: teacher.email,
-        role: teacher.role,
-        speciality: teacher.speciality,
-        level: teacher.level
+        id: savedTeacher._id,
+        firstName: savedTeacher.firstName,
+        lastName: savedTeacher.lastName,
+        email: savedTeacher.email,
+        role: savedTeacher.role,
+        speciality: savedTeacher.speciality,
+        level: savedTeacher.level
       }
     });
   } catch (error) {
-    console.error('Erreur lors de la création du compte professeur:', error);
-    res.status(400).json({ message: 'Erreur lors de la création du compte' });
+    console.error('Erreur détaillée lors de la création du compte:', error);
+    res.status(400).json({ 
+      message: 'Erreur lors de la création du compte',
+      details: error.message,
+      stack: error.stack
+    });
   }
 });
 

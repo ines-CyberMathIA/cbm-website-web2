@@ -24,9 +24,12 @@ const CompleteTeacherRegistration = () => {
 
     const verifyToken = async () => {
       try {
-        const response = await axios.post('http://localhost:5003/api/users/verify-teacher-token', { token });
+        console.log('Vérification du token:', token);
+        const response = await axios.post('http://localhost:5000/api/users/verify-teacher-token', { token });
+        console.log('Réponse de vérification:', response.data);
         setTokenData(response.data);
       } catch (error) {
+        console.error('Erreur de vérification du token:', error);
         setError('Ce lien est invalide ou a expiré');
       }
     };
@@ -54,16 +57,20 @@ const CompleteTeacherRegistration = () => {
       const searchParams = new URLSearchParams(location.search);
       const token = searchParams.get('token');
 
-      const response = await axios.post('http://localhost:5003/api/users/complete-teacher-registration', {
+      console.log('Finalisation de l\'inscription avec token:', token);
+      const response = await axios.post('http://localhost:5000/api/users/complete-teacher-registration', {
         token,
         password: formData.password
       });
+
+      console.log('Réponse de finalisation:', response.data);
 
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       navigate('/teacher-dashboard');
     } catch (error) {
-      setError(error.response?.data?.message || 'Une erreur est survenue');
+      console.error('Erreur lors de la finalisation:', error);
+      setError(error.response?.data?.message || 'Erreur lors de la création du compte');
     } finally {
       setLoading(false);
     }

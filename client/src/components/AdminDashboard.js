@@ -39,10 +39,12 @@ const AdminDashboard = () => {
   // Fonction pour récupérer les statistiques
   const fetchStats = async () => {
     try {
+      console.log('Récupération des statistiques...');
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5001/api/admin/stats', {
+      const response = await axios.get('http://localhost:5000/api/admin/stats', {
         headers: { Authorization: `Bearer ${token}` }
       });
+      console.log('Statistiques reçues:', response.data);
       setStats(response.data);
     } catch (error) {
       console.error('Erreur lors du chargement des statistiques:', error);
@@ -58,10 +60,12 @@ const AdminDashboard = () => {
   const fetchUsersByRole = async (role) => {
     setLoading(true);
     try {
+      console.log('Récupération des utilisateurs pour le rôle:', role);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`http://localhost:5001/api/admin/users/${role}`, {
+      const response = await axios.get(`http://localhost:5000/api/admin/users/${role}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      console.log(`Utilisateurs trouvés: ${response.data.length}`);
       setUsersList(response.data);
       setSelectedRole(role);
       setActiveSection('users');
@@ -74,6 +78,7 @@ const AdminDashboard = () => {
 
   // Fonction pour ouvrir la modal de confirmation
   const handleDeleteClick = (user) => {
+    console.log('Ouverture de la modal de suppression pour:', user);
     setUserToDelete(user);
     setShowDeleteModal(true);
   };
@@ -81,9 +86,11 @@ const AdminDashboard = () => {
   // Fonction pour effectuer la suppression
   const confirmDelete = async () => {
     try {
-      await axios.delete(`http://localhost:5003/api/admin/users/${userToDelete._id}`, {
+      console.log('Tentative de suppression de l\'utilisateur:', userToDelete._id);
+      const token = localStorage.getItem('token');
+      await axios.delete(`http://localhost:5000/api/admin/users/${userToDelete._id}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
+          Authorization: `Bearer ${token}`
         }
       });
 
@@ -160,14 +167,14 @@ const AdminDashboard = () => {
                   <div className="mt-4 flex justify-end space-x-3">
                     <button
                       type="button"
-                      className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
+                      className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                       onClick={() => setShowDeleteModal(false)}
                     >
                       Annuler
                     </button>
                     <button
                       type="button"
-                      className="inline-flex justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                      className="inline-flex justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
                       onClick={confirmDelete}
                     >
                       Supprimer
