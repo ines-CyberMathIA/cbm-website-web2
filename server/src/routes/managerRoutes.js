@@ -4,6 +4,7 @@ import authMiddleware from '../middleware/authMiddleware.js';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import PendingTeacher from '../models/PendingTeacher.js';
+import TeacherAvailability from '../models/TeacherAvailability.js';
 
 const router = express.Router();
 
@@ -304,6 +305,22 @@ router.delete('/pending-teachers/:id', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Erreur lors de la suppression de l\'invitation:', error);
     res.status(500).json({ message: 'Erreur lors de la suppression de l\'invitation' });
+  }
+});
+
+// Ajouter cette nouvelle route
+router.get('/teacher/:teacherId/availabilities', authMiddleware, async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    console.log('Récupération des disponibilités pour le professeur:', teacherId);
+
+    const availabilities = await TeacherAvailability.find({ teacherId });
+    console.log('Disponibilités trouvées:', availabilities);
+
+    res.json(availabilities);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des disponibilités:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 });
 
