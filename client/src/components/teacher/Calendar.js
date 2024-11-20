@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import config from '../../config';
 
 const Calendar = () => {
   const [availabilities, setAvailabilities] = useState([]);
@@ -132,53 +133,16 @@ const Calendar = () => {
         selected => selected.day === slot.day && selected.time === slot.time
       ));
 
-    // Grouper par jour
-    const slotsByDay = {};
-    remainingSlots.forEach(slot => {
-      if (!slotsByDay[slot.day]) {
-        slotsByDay[slot.day] = [];
-      }
-      slotsByDay[slot.day].push(slot);
+    // Convertir en plages horaires
+    const ranges = convertSlotsToRanges(remainingSlots);
+
+    // Vérifier que chaque plage fait au moins 1h30
+    return ranges.every(range => {
+      const start = new Date(`2000-01-01T${range.startTime}`);
+      const end = new Date(`2000-01-01T${range.endTime}`);
+      const duration = (end - start) / (1000 * 60); // durée en minutes
+      return duration >= 90; // 1h30 = 90 minutes
     });
-
-    // Pour chaque jour qui a encore des créneaux
-    for (const day in slotsByDay) {
-      if (slotsByDay[day].length === 0) continue; // Ignorer les jours vides
-
-      const daySlots = slotsByDay[day].sort((a, b) => a.time.localeCompare(b.time));
-      let currentGroup = [];
-
-      // Parcourir tous les créneaux du jour
-      for (let i = 0; i < daySlots.length; i++) {
-        const currentSlot = daySlots[i];
-        
-        if (currentGroup.length === 0) {
-          currentGroup.push(currentSlot);
-        } else {
-          const lastSlot = currentGroup[currentGroup.length - 1];
-          const lastTime = new Date(`2000-01-01T${lastSlot.time}`);
-          const currentTime = new Date(`2000-01-01T${currentSlot.time}`);
-          const diffMinutes = (currentTime - lastTime) / (1000 * 60);
-
-          if (diffMinutes === 30) {
-            currentGroup.push(currentSlot);
-          } else {
-            // Vérifier le groupe précédent
-            if (currentGroup.length < 3) { // moins de 1h30
-              return false;
-            }
-            currentGroup = [currentSlot];
-          }
-        }
-      }
-
-      // Vérifier le dernier groupe
-      if (currentGroup.length > 0 && currentGroup.length < 3) {
-        return false;
-      }
-    }
-
-    return true;
   };
 
   // Supprimer les créneaux sélectionnés
@@ -216,7 +180,7 @@ const Calendar = () => {
     const fetchAvailabilities = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('http://localhost:5003/api/teacher/availabilities', {
+        const response = await axios.get(`${config.API_URL}/api/teacher/availabilities`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`
           }
@@ -254,37 +218,77 @@ const Calendar = () => {
   // Fonction pour convertir les créneaux en plages horaires pour la sauvegarde
   const convertSlotsToRanges = (slots) => {
     const ranges = [];
-    const sortedSlots = [...slots].sort((a, b) => {
-      if (a.day !== b.day) return days.indexOf(a.day) - days.indexOf(b.day);
-      return a.time.localeCompare(b.time);
+    const slotsByDay = {};
+
+    // Grouper les créneaux par jour
+    slots.forEach(slot => {
+      if (!slotsByDay[slot.day]) {
+        slotsByDay[slot.day] = [];
+      }
+      slotsByDay[slot.day].push(slot.time);
     });
 
-    let currentRange = null;
-    sortedSlots.forEach(slot => {
-      if (!currentRange) {
-        currentRange = {
-          day: slot.day,
-          startTime: slot.time,
-          endTime: addMinutes(slot.time, 30)
-        };
-      } else if (
-        currentRange.day === slot.day && 
-        currentRange.endTime === slot.time
-      ) {
-        currentRange.endTime = addMinutes(slot.time, 30);
-      } else {
-        ranges.push(currentRange);
-        currentRange = {
-          day: slot.day,
-          startTime: slot.time,
-          endTime: addMinutes(slot.time, 30)
-        };
-      }
+    // Pour chaque jour
+    Object.entries(slotsByDay).forEach(([day, times]) => {
+      // Trier les horaires
+      times.sort();
+      
+      let startTime = null;
+      let lastTime = null;
+
+      times.forEach((time, index) => {
+        if (!startTime) {
+          startTime = time;
+          lastTime = time;
+        } else {
+          const lastDate = new Date(`2000-01-01T${lastTime}`);
+          const currentDate = new Date(`2000-01-01T${time}`);
+          const diffMinutes = (currentDate - lastDate) / (1000 * 60);
+
+          if (diffMinutes > 30) {
+            // Si on a un trou, on crée une nouvelle plage
+            ranges.push({
+              day,
+              startTime,
+              endTime: addMinutes(lastTime, 30)
+            });
+            startTime = time;
+          }
+          lastTime = time;
+
+          // Si c'est le dernier créneau du jour
+          if (index === times.length - 1) {
+            ranges.push({
+              day,
+              startTime,
+              endTime: addMinutes(time, 30)
+            });
+          }
+        }
+      });
     });
-    if (currentRange) {
-      ranges.push(currentRange);
-    }
+
     return ranges;
+  };
+
+  // Fonction pour vérifier si toutes les plages font au moins 1h30
+  const validateRanges = (ranges) => {
+    return ranges.every(range => {
+      const start = new Date(`2000-01-01T${range.startTime}`);
+      const end = new Date(`2000-01-01T${range.endTime}`);
+      const duration = (end - start) / (1000 * 60);
+      
+      if (duration < 90) {
+        console.log('Plage invalide détectée:', {
+          day: range.day,
+          startTime: range.startTime,
+          endTime: range.endTime,
+          duration
+        });
+        return false;
+      }
+      return true;
+    });
   };
 
   // Fonction utilitaire pour ajouter des minutes à une heure
@@ -305,54 +309,30 @@ const Calendar = () => {
 
       // En mode ajout, ajouter les créneaux sélectionnés
       if (mode === 'add' && selectedSlots.length > 0) {
-        // Vérifier que les nouveaux créneaux forment des plages valides
-        const allSlots = [...availabilities, ...selectedSlots];
-        const slotsByDay = groupSlotsByDay(allSlots);
-        
-        // Vérifier chaque jour
-        for (const day in slotsByDay) {
-          const groups = getConsecutiveGroups(slotsByDay[day]);
-          if (!groups.every(group => group.length >= 3)) {
-            setError("Les plages horaires doivent faire au moins 1h30");
-            setSaveStatus('error');
-            return;
-          }
-        }
-
-        newAvailabilities = allSlots;
+        newAvailabilities = [...availabilities, ...selectedSlots];
       }
       // En mode suppression, retirer les créneaux sélectionnés
       else if (mode === 'delete' && selectedSlots.length > 0) {
-        // Filtrer les créneaux à conserver
-        const remainingSlots = availabilities.filter(slot => 
+        newAvailabilities = availabilities.filter(slot => 
           !selectedSlots.some(selected => 
             selected.day === slot.day && selected.time === slot.time
           )
         );
-
-        // Vérifier que les plages restantes sont valides
-        const slotsByDay = groupSlotsByDay(remainingSlots);
-        
-        for (const day in slotsByDay) {
-          if (slotsByDay[day].length > 0) {  // Ne vérifier que les jours avec des créneaux
-            const groups = getConsecutiveGroups(slotsByDay[day]);
-            if (!groups.every(group => group.length >= 3)) {
-              setError("La suppression créerait des plages horaires inférieures à 1h30");
-              setSaveStatus('error');
-              return;
-            }
-          }
-        }
-
-        newAvailabilities = remainingSlots;
       }
 
       // Convertir en plages horaires pour la sauvegarde
       const ranges = convertSlotsToRanges(newAvailabilities);
       
+      // Vérifier que chaque plage fait au moins 1h30
+      if (!validateRanges(ranges)) {
+        setError("Les plages horaires doivent faire au moins 1h30");
+        setSaveStatus('error');
+        return;
+      }
+
       // Envoyer au serveur
       await axios.post(
-        'http://localhost:5003/api/teacher/availabilities',
+        `${config.API_URL}/api/teacher/availabilities`,
         { availabilities: ranges },
         {
           headers: {
@@ -370,7 +350,7 @@ const Calendar = () => {
       setTimeout(() => setSaveStatus(''), 3000);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
-      setError('Erreur lors de la sauvegarde des disponibilités');
+      setError(error.response?.data?.message || 'Erreur lors de la sauvegarde');
       setSaveStatus('error');
     }
   };

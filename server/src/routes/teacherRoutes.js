@@ -28,6 +28,38 @@ router.post('/availabilities', authMiddleware, async (req, res) => {
       return res.status(400).json({ message: 'Format de données invalide' });
     }
 
+    console.log('Plages horaires reçues:', availabilities.map(slot => ({
+      day: slot.day,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      duration: (new Date(`2000-01-01T${slot.endTime}`) - new Date(`2000-01-01T${slot.startTime}`)) / (1000 * 60)
+    })));
+
+    // Vérifier que chaque plage fait au moins 1h30
+    const isValid = availabilities.every(slot => {
+      const start = new Date(`2000-01-01T${slot.startTime}`);
+      const end = new Date(`2000-01-01T${slot.endTime}`);
+      const duration = (end - start) / (1000 * 60); // durée en minutes
+      
+      if (duration < 90) {
+        console.log('Plage invalide détectée:', {
+          day: slot.day,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          duration: duration
+        });
+        return false;
+      }
+      return true;
+    });
+
+    if (!isValid) {
+      console.log('Validation échouée: plages horaires invalides');
+      return res.status(400).json({ 
+        message: 'Les plages horaires doivent faire au moins 1h30'
+      });
+    }
+
     console.log('Suppression des anciennes disponibilités');
     await TeacherAvailability.deleteMany({ teacherId: req.user._id });
     
@@ -40,7 +72,7 @@ router.post('/availabilities', authMiddleware, async (req, res) => {
     }));
     
     const saved = await TeacherAvailability.insertMany(newAvailabilities);
-    console.log('Disponibilités sauvegardées:', saved.length);
+    console.log('Disponibilités sauvegardées:', saved);
     
     res.json({ 
       message: 'Disponibilités sauvegardées avec succès',
