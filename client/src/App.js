@@ -11,32 +11,97 @@ import HeroSection from './components/HeroSection';
 import PrivateRoute from './components/PrivateRoute';
 
 function App() {
+  // Vérifier si l'utilisateur est connecté avec un token valide
+  const isAuthenticated = () => {
+    try {
+      const token = localStorage.getItem('token');
+      const userStr = localStorage.getItem('user');
+      
+      if (!token || !userStr) {
+        return false;
+      }
+
+      const user = JSON.parse(userStr);
+      return !!(user && user.role);
+
+    } catch (error) {
+      console.error('Erreur de vérification d\'authentification:', error);
+      return false;
+    }
+  };
+
+  // Obtenir le rôle de l'utilisateur
+  const getUserRole = () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return null;
+      const user = JSON.parse(userStr);
+      return user.role || null;  // Retourner null si pas de rôle
+    } catch {
+      return null;
+    }
+  };
+
   return (
     <Router>
       <div className="min-h-screen bg-gray-100">
         <Routes>
-          <Route path="/" element={<HeroSection />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
+          {/* Routes publiques */}
+          <Route path="/" element={
+            isAuthenticated() && getUserRole() ? 
+            <Navigate to={`/${getUserRole()}/dashboard`} replace /> : 
+            <HeroSection />
+          } />
           
-          {/* Route protégée pour le dashboard admin */}
-          <Route 
-            path="/admin/dashboard/*" 
-            element={
-              <PrivateRoute>
-                <AdminDashboard />
-              </PrivateRoute>
-            } 
-          />
-
-          {/* Autres routes protégées */}
-          <Route path="/parent/dashboard/*" element={<PrivateRoute><ParentDashboard /></PrivateRoute>} />
-          <Route path="/teacher/dashboard/*" element={<PrivateRoute><TeacherDashboard /></PrivateRoute>} />
-          <Route path="/manager/dashboard/*" element={<PrivateRoute><ManagerDashboard /></PrivateRoute>} />
+          <Route path="/login" element={
+            isAuthenticated() && getUserRole() ? 
+            <Navigate to={`/${getUserRole()}/dashboard`} replace /> : 
+            <Login />
+          } />
+          
+          <Route path="/register" element={
+            isAuthenticated() && getUserRole() ? 
+            <Navigate to={`/${getUserRole()}/dashboard`} replace /> : 
+            <Register />
+          } />
+          
+          <Route path="/admin/login" element={
+            isAuthenticated() && getUserRole() === 'admin' ? 
+            <Navigate to="/admin/dashboard" replace /> : 
+            <AdminLogin />
+          } />
+          
+          {/* Routes protégées */}
+          <Route path="/admin/dashboard/*" element={
+            <PrivateRoute>
+              <AdminDashboard />
+            </PrivateRoute>
+          } />
+          
+          <Route path="/parent/dashboard/*" element={
+            <PrivateRoute>
+              <ParentDashboard />
+            </PrivateRoute>
+          } />
+          
+          <Route path="/teacher/dashboard/*" element={
+            <PrivateRoute>
+              <TeacherDashboard />
+            </PrivateRoute>
+          } />
+          
+          <Route path="/manager/dashboard/*" element={
+            <PrivateRoute>
+              <ManagerDashboard />
+            </PrivateRoute>
+          } />
           
           {/* Redirection par défaut */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={
+            isAuthenticated() && getUserRole() ? 
+            <Navigate to={`/${getUserRole()}/dashboard`} replace /> : 
+            <Navigate to="/" replace />
+          } />
         </Routes>
       </div>
     </Router>

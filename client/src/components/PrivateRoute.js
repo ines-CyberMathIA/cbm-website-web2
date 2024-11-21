@@ -3,27 +3,37 @@ import { Navigate } from 'react-router-dom';
 
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('token');
-  const user = JSON.parse(localStorage.getItem('user'));
+  const userStr = localStorage.getItem('user');
 
-  if (!token || !user) {
-    // Rediriger vers la page de connexion appropriée en fonction du rôle
-    const role = user?.role;
-    switch (role) {
-      case 'admin':
-        return <Navigate to="/admin/login" replace />;
-      case 'teacher':
-        return <Navigate to="/login" replace />;
-      case 'parent':
-        return <Navigate to="/login" replace />;
-      case 'manager':
-        return <Navigate to="/login" replace />;
-      default:
-        return <Navigate to="/login" replace />;
-    }
+  // Si pas de token ou pas d'utilisateur, rediriger vers la page de connexion
+  if (!token || !userStr) {
+    console.log('Pas de token ou pas d\'utilisateur, redirection vers /login');
+    return <Navigate to="/login" replace />;
   }
 
-  // Si l'utilisateur est authentifié, afficher le composant protégé
-  return children;
+  try {
+    const user = JSON.parse(userStr);
+    console.log('Utilisateur connecté:', user);
+
+    // Rediriger vers le bon dashboard selon le rôle
+    const path = window.location.pathname;
+    const correctPath = `/${user.role}/dashboard`;
+
+    if (!path.startsWith(correctPath)) {
+      console.log(`Redirection vers le dashboard ${user.role}`);
+      return <Navigate to={correctPath} replace />;
+    }
+
+    // Si tout est OK, afficher le composant protégé
+    console.log('Accès autorisé au composant protégé');
+    return children;
+
+  } catch (error) {
+    console.error('Erreur lors de la lecture des données utilisateur:', error);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    return <Navigate to="/login" replace />;
+  }
 };
 
 export default PrivateRoute; 

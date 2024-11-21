@@ -39,26 +39,9 @@ const Login = () => {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
 
-        // Redirection directe selon le rôle (sans alert)
-        switch (formData.role) {
-          case 'parent':
-            navigate('/parent-dashboard');
-            break;
-          case 'student':
-            navigate('/student-dashboard');
-            break;
-          case 'teacher':
-            navigate('/teacher-dashboard');
-            break;
-          case 'manager':
-            navigate('/manager-dashboard');
-            break;
-          case 'admin':
-            navigate('/admin-dashboard');
-            break;
-          default:
-            navigate('/');
-        }
+        // Redirection selon le rôle
+        const role = response.data.user.role;
+        navigate(`/${role}/dashboard`);
       } else {
         setError('Erreur lors de la connexion : token manquant');
       }

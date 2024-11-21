@@ -10,14 +10,23 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  login: {
+    type: String,
+    unique: true,
+    sparse: true // Permet d'avoir des valeurs null pour les non-élèves
+  },
   email: {
     type: String,
-    required: true,
+    required: function() { 
+      return this.role !== 'student';
+    },
     unique: true,
+    sparse: true,
     lowercase: true
   },
   password: {
-    type: String
+    type: String,
+    required: true
   },
   role: {
     type: String,
@@ -31,8 +40,14 @@ const userSchema = new mongoose.Schema({
   },
   level: [{
     type: String,
-    enum: ['college', 'lycee', 'superieur', 'adulte']
+    enum: ['6eme', '5eme', '4eme', '3eme', '2nde', '1ere', 'terminale'],
+    required: function() { return this.role === 'student'; }
   }],
+  parentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: function() { return this.role === 'student'; }
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -52,13 +67,48 @@ const userSchema = new mongoose.Schema({
   }
 });
 
-// Hash le mot de passe avant de sauvegarder
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
+// Fonction pour générer un login unique
+async function generateUniqueLogin(firstName, lastName) {
+  // Nettoyer et formater le prénom et le nom
+  const cleanFirstName = firstName.toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z]/g, '');
   
+  const cleanLastName = lastName.toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z]/g, '');
+
+  // Base du login : première lettre du prénom + nom
+  let baseLogin = `${cleanFirstName.charAt(0)}${cleanLastName}`;
+  let login = baseLogin;
+  let counter = 1;
+
+  // Vérifier si le login existe déjà
+  while (await mongoose.model('User').findOne({ login })) {
+    login = `${baseLogin}${counter}`;
+    counter++;
+  }
+
+  return login;
+}
+
+// Middleware pre-save pour générer le login des élèves
+userSchema.pre('save', async function(next) {
   try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
+    // Générer un login uniquement pour les nouveaux élèves
+    if (this.isNew && this.role === 'student' && !this.login) {
+      this.login = await generateUniqueLogin(this.firstName, this.lastName);
+      console.log('Login généré pour l\'élève:', this.login);
+    }
+
+    // Hash le mot de passe si modifié
+    if (this.isModified('password')) {
+      const salt = await bcrypt.genSalt(10);
+      this.password = await bcrypt.hash(this.password, salt);
+    }
+
     next();
   } catch (error) {
     next(error);

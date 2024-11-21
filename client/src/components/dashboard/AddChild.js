@@ -26,11 +26,14 @@ const AddChild = ({ onChildAdded }) => {
         'http://localhost:5000/api/children',
         formData,
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         }
       );
 
-      onChildAdded(response.data);
+      onChildAdded(response.data.child);
     } catch (error) {
       console.error('Erreur lors de l\'ajout de l\'enfant:', error);
       setError(error.response?.data?.message || 'Une erreur est survenue');
