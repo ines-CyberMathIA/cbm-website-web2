@@ -228,19 +228,34 @@ const adminController = {
     }
   },
 
-  getStats: async () => {
-    const stats = {
-      totalUsers: await User.countDocuments(),
-      totalTeachers: await User.countDocuments({ role: 'teacher' }),
-      totalStudents: await User.countDocuments({ role: 'student' }),
-      totalParents: await User.countDocuments({ role: 'parent' }),
-      totalManagers: await User.countDocuments({ role: 'manager' })
-    };
-    return stats;
+  getStats: async (req, res) => {
+    try {
+      const stats = {
+        totalUsers: await User.countDocuments(),
+        totalTeachers: await User.countDocuments({ role: 'teacher' }),
+        totalStudents: await User.countDocuments({ role: 'student' }),
+        totalParents: await User.countDocuments({ role: 'parent' }),
+        totalManagers: await User.countDocuments({ role: 'manager' })
+      };
+      console.log('Statistiques récupérées:', stats);
+      res.json(stats);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des stats:', error);
+      res.status(500).json({ message: 'Erreur lors de la récupération des statistiques' });
+    }
   },
 
-  getConnections: async () => {
-    return await LoginLog.find().sort({ timestamp: -1 }).limit(100);
+  getConnections: async (req, res) => {
+    try {
+      const connections = await LoginLog.find()
+        .sort({ timestamp: -1 })
+        .limit(100);
+      console.log('Connexions récupérées:', connections.length);
+      res.json(connections);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des connexions:', error);
+      res.status(500).json({ message: 'Erreur lors de la récupération des connexions' });
+    }
   },
 
   getUsersByRole: async (role) => {

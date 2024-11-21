@@ -10,24 +10,10 @@ router.post('/login', adminController.login);
 router.post('/verify-2fa', adminController.verifyTwoFactor);
 
 // Routes protégées nécessitant une authentification admin
-router.get('/stats', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const stats = await adminController.getStats();
-    res.json(stats);
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la récupération des statistiques' });
-  }
-});
+router.get('/stats', authMiddleware, adminMiddleware, adminController.getStats);
+router.get('/connections', authMiddleware, adminMiddleware, adminController.getConnections);
 
-router.get('/connections', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const connections = await adminController.getConnections();
-    res.json(connections);
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la récupération des connexions' });
-  }
-});
-
+// Autres routes protégées
 router.get('/users/:role', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const users = await adminController.getUsersByRole(req.params.role);
