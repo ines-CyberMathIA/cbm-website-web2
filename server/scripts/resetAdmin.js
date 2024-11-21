@@ -15,33 +15,57 @@ const resetAdmin = async () => {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('Connecté à MongoDB');
     
-    // Supprimer l'ancien compte admin
-    await User.deleteOne({ email: 'admin@cybermathia.com' });
-    console.log('Ancien compte admin supprimé');
+    // Vérifier si l'admin existe déjà
+    const existingAdmin = await User.findOne({ email: 'admin_cybermathia' });
+    console.log('Admin existant:', existingAdmin);
 
-    // Créer un nouveau compte admin avec le mot de passe non hashé
-    const admin = new User({
+    // Supprimer l'ancien compte admin
+    const deleteResult = await User.deleteOne({ email: 'admin_cybermathia' });
+    console.log('Résultat de la suppression:', deleteResult);
+
+    // Hasher le mot de passe manuellement
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash('Admin123!@#', salt);
+    console.log('Mot de passe hashé:', hashedPassword);
+
+    // Créer le nouvel admin directement dans la base de données
+    const result = await User.collection.insertOne({
       firstName: 'Admin',
       lastName: 'CyberMathIA',
-      email: 'admin@cybermathia.com',
-      password: 'Admin123!@#',  // Le modèle User hashera automatiquement le mot de passe
-      role: 'admin'
+      email: 'admin_cybermathia',
+      password: hashedPassword,
+      role: 'admin',
+      notificationEmail: 'admin@cybermathia.com',
+      createdAt: new Date()
     });
 
-    await admin.save();
-    console.log('Nouveau compte admin créé');
+    console.log('Résultat de l\'insertion:', result);
 
     // Vérifier que le compte a bien été créé
-    const savedAdmin = await User.findOne({ email: 'admin@cybermathia.com' });
-    console.log('Compte admin vérifié:', {
-      email: savedAdmin.email,
-      role: savedAdmin.role,
-      passwordHash: savedAdmin.password.substring(0, 10) + '...'
+    const verifiedAdmin = await User.findOne({ email: 'admin_cybermathia' });
+    console.log('Vérification finale:', {
+      found: !!verifiedAdmin,
+      email: verifiedAdmin?.email,
+      role: verifiedAdmin?.role,
+      hashedPassword: verifiedAdmin?.password,
+      passwordMatch: await bcrypt.compare('Admin123!@#', verifiedAdmin?.password)
+    });
+
+    // Test de connexion
+    const testLogin = await User.findOne({ 
+      email: 'admin_cybermathia',
+      role: 'admin'
+    });
+    console.log('Test de connexion:', {
+      found: !!testLogin,
+      email: testLogin?.email,
+      role: testLogin?.role,
+      passwordValid: testLogin ? await bcrypt.compare('Admin123!@#', testLogin.password) : false
     });
 
     process.exit(0);
   } catch (error) {
-    console.error('Erreur:', error);
+    console.error('Erreur détaillée:', error);
     process.exit(1);
   }
 };

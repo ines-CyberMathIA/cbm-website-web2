@@ -41,6 +41,14 @@ const userSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  },
+  twoFactorCode: {
+    type: String,
+    default: null
+  },
+  notificationEmail: {
+    type: String,
+    required: function() { return this.role === 'admin'; }
   }
 });
 

@@ -18,7 +18,7 @@ const MessagesSection = () => {
         const response = await axios.get('http://localhost:5000/api/manager/my-teachers', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setTeachers(response.data.filter(t => t.status === 'active'));
+        setTeachers(response.data);
       } catch (error) {
         console.error('Erreur lors du chargement des professeurs:', error);
       }
@@ -76,9 +76,11 @@ const MessagesSection = () => {
     }
   };
 
-  const filteredTeachers = teachers.filter(teacher => 
-    `${teacher.firstName} ${teacher.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredTeachers = teachers
+    .filter(teacher => 
+      teacher.status !== 'pending' &&
+      `${teacher.firstName} ${teacher.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   return (
     <div className="flex h-[calc(100vh-8rem)]">
@@ -124,19 +126,31 @@ const MessagesSection = () => {
             {messages.map((message) => (
               <div
                 key={message._id}
-                className={`flex ${message.sender._id === user.id ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${message.sender.role === 'manager' ? 'justify-end' : 'justify-start'}`}
               >
-                <div
-                  className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                    message.sender._id === user.id
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-white text-gray-900 shadow'
-                  }`}
-                >
-                  <p className="text-sm">{message.content}</p>
-                  <p className="text-xs mt-1 opacity-75">
-                    {new Date(message.createdAt).toLocaleTimeString()}
-                  </p>
+                <div className="max-w-[70%]">
+                  <div className="flex items-center mb-1">
+                    <span className="text-xs text-gray-500">
+                      {message.sender.firstName} {message.sender.lastName}
+                    </span>
+                    <span className="text-xs text-gray-400 ml-2">
+                      {new Date(message.createdAt).toLocaleTimeString()}
+                    </span>
+                  </div>
+                  <div
+                    className={`rounded-lg px-4 py-2 ${
+                      message.sender.role === 'manager'
+                        ? 'bg-gray-100 text-gray-900'
+                        : 'bg-indigo-600 text-white'
+                    }`}
+                  >
+                    <p className="text-sm">{message.content}</p>
+                  </div>
+                  <div className={`text-xs mt-1 text-gray-500 ${
+                    message.sender.role === 'manager' ? 'text-right' : 'text-left'
+                  }`}>
+                    {message.read ? 'Lu' : 'Envoyé'}
+                  </div>
                 </div>
               </div>
             ))}

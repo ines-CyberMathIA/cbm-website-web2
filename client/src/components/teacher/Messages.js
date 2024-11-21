@@ -125,7 +125,7 @@ const Messages = () => {
               {dateMessages.map((message) => (
                 <div
                   key={message._id}
-                  className={`flex ${message.sender._id === user.id ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${message.sender.role === 'teacher' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className="max-w-[70%]">
                     <div className="flex items-center mb-1">
@@ -138,18 +138,18 @@ const Messages = () => {
                     </div>
                     <div
                       className={`rounded-lg px-4 py-2 ${
-                        message.sender._id === user.id
-                          ? 'bg-gray-100 text-gray-900'
-                          : 'bg-indigo-600 text-white'
+                        message.sender.role === 'teacher'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-gray-100 text-gray-900'
                       }`}
                     >
                       <p className="text-sm">{message.content}</p>
                     </div>
-                    {message.sender._id === user.id && (
-                      <div className="text-xs text-right mt-1 text-gray-500">
-                        {message.read ? 'Lu' : 'Envoyé'}
-                      </div>
-                    )}
+                    <div className={`text-xs mt-1 text-gray-500 ${
+                      message.sender.role === 'teacher' ? 'text-right' : 'text-left'
+                    }`}>
+                      {message.read ? 'Lu' : 'Envoyé'}
+                    </div>
                   </div>
                 </div>
               ))}

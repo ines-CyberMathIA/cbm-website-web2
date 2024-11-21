@@ -1,139 +1,166 @@
 import User from '../models/User.js';
 import LoginLog from '../models/LoginLog.js';
-import nodemailer from 'nodemailer';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import TeacherAvailability from '../models/TeacherAvailability.js';
+import nodemailer from 'nodemailer';
 
-// Configuration du transporteur email
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  auth: {
-    user: 'noreply.cybermathia@gmail.com',
-    pass: 'zayf pfpp iatp dmwm'
-  },
-  debug: true,
-  logger: true
-});
-
-// Test de connexion SMTP au démarrage
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('Erreur de configuration SMTP:', {
-      error: error.message,
-      code: error.code,
-      command: error.command
-    });
-  } else {
-    console.log('Configuration SMTP réussie:', {
-      success,
-      user: 'noreply.cybermathia@gmail.com',
-      host: 'smtp.gmail.com'
-    });
-  }
-});
-
-// Stockage temporaire des codes 2FA (en production, utiliser Redis)
-const twoFactorCodes = new Map();
-
-// Fonction pour envoyer le code 2FA avec plus de logs
-const send2FACode = async (code) => {
+// Configuration du transporteur email avec OAuth2
+const createTransporter = async () => {
   try {
-    console.log('Préparation de l\'envoi d\'email...');
-    
-    // Configuration de l'email
-    const mailOptions = {
-      from: '"CyberMathIA Admin" <noreply.cybermathia@gmail.com>',
-      to: 'admin@cybermathia.com', // Changez ceci par votre email pour les tests
-      subject: 'Code de vérification CyberMathIA',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #4F46E5;">Code de vérification administrateur</h1>
-          <p style="font-size: 18px;">Votre code de vérification est : <strong style="color: #4F46E5; font-size: 24px;">${code}</strong></p>
-          <p>Ce code expire dans 5 minutes.</p>
-        </div>
-      `,
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
       auth: {
         user: 'noreply.cybermathia@gmail.com',
         pass: 'zayf pfpp iatp dmwm'
+      },
+      tls: {
+        rejectUnauthorized: false,
+        ciphers: 'SSLv3'
       }
-    };
-
-    console.log('Tentative d\'envoi avec les options:', {
-      from: mailOptions.from,
-      to: mailOptions.to,
-      subject: mailOptions.subject
     });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email envoyé avec succès:', {
-      messageId: info.messageId,
-      response: info.response,
-      accepted: info.accepted,
-      rejected: info.rejected
+    // Test de connexion
+    const testResult = await transporter.verify();
+    console.log('Test de connexion SMTP:', {
+      result: testResult,
+      host: 'smtp.gmail.com',
+      port: 587,
+      user: 'noreply.cybermathia@gmail.com'
     });
-
-    return true;
+    
+    return transporter;
   } catch (error) {
-    console.error('Erreur détaillée lors de l\'envoi:', {
-      name: error.name,
+    console.error('Erreur de configuration SMTP:', {
       message: error.message,
       code: error.code,
-      command: error.command
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode,
+      stack: error.stack
     });
-    return false;
+    return null;
   }
+};
+
+// Fonction pour envoyer un email avec retry et plus de logs
+const sendEmail = async (to, subject, html, retryCount = 3) => {
+  for (let i = 0; i < retryCount; i++) {
+    try {
+      console.log(`Tentative d'envoi d'email (${i + 1}/${retryCount}) à ${to}`);
+      
+      const transporter = await createTransporter();
+      if (!transporter) {
+        throw new Error('Impossible de créer le transporteur SMTP');
+      }
+
+      const mailOptions = {
+        from: {
+          name: 'CyberMathIA',
+          address: 'noreply.cybermathia@gmail.com'
+        },
+        to,
+        subject,
+        html,
+        headers: {
+          'X-Priority': '1',
+          'X-MSMail-Priority': 'High',
+          'Importance': 'high'
+        }
+      };
+
+      console.log('Options du mail:', {
+        to: mailOptions.to,
+        subject: mailOptions.subject,
+        from: mailOptions.from
+      });
+
+      const info = await transporter.sendMail(mailOptions);
+
+      console.log('Email envoyé avec succès:', {
+        messageId: info.messageId,
+        response: info.response,
+        accepted: info.accepted,
+        rejected: info.rejected,
+        envelope: info.envelope
+      });
+      
+      return true;
+    } catch (error) {
+      console.error(`Erreur lors de la tentative ${i + 1}:`, {
+        error: error.message,
+        code: error.code,
+        command: error.command,
+        response: error.response,
+        stack: error.stack
+      });
+      
+      if (i === retryCount - 1) throw error;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  return false;
 };
 
 const adminController = {
   login: async (req, res) => {
     try {
-      console.log('Tentative de connexion admin:', req.body);
       const { login, password } = req.body;
+      console.log('Tentative de connexion admin avec:', { login });
 
-      // Vérifier le login
-      if (login !== 'admin_cybermathia') {
-        return res.status(401).json({ message: 'Identifiants incorrects' });
-      }
-
-      // Vérifier si l'utilisateur admin existe
-      const admin = await User.findOne({ email: 'admin@cybermathia.com', role: 'admin' });
-      if (!admin) {
-        return res.status(401).json({ message: 'Compte administrateur non trouvé' });
-      }
-
-      // Vérifier le mot de passe
-      const isValidPassword = await bcrypt.compare(password, admin.password);
-      if (!isValidPassword) {
-        return res.status(401).json({ message: 'Identifiants incorrects' });
-      }
-
-      // Générer un code 2FA
-      const twoFactorCode = Math.floor(100000 + Math.random() * 900000).toString();
-      twoFactorCodes.set(login, {
-        code: twoFactorCode,
-        timestamp: Date.now(),
-        attempts: 0
+      const admin = await User.findOne({ 
+        email: login,
+        role: 'admin'
       });
 
+      if (!admin) {
+        console.log('Admin non trouvé avec identifiant:', login);
+        return res.status(401).json({ message: 'Identifiants invalides' });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, admin.password);
+      if (!isValidPassword) {
+        console.log('Mot de passe invalide pour:', login);
+        return res.status(401).json({ message: 'Identifiants invalides' });
+      }
+
+      // Générer un code 2FA aléatoire à 6 chiffres
+      const twoFactorCode = Math.floor(100000 + Math.random() * 900000).toString();
       console.log('Code 2FA généré:', twoFactorCode);
 
-      // Toujours essayer d'envoyer l'email, même en développement
-      const emailSent = await send2FACode(twoFactorCode);
-      console.log('Statut envoi email:', emailSent);
+      // Stocker le code hashé
+      const salt = await bcrypt.genSalt(10);
+      const hashedCode = await bcrypt.hash(twoFactorCode, salt);
+      admin.twoFactorCode = hashedCode;
+      await admin.save();
+      console.log('Code 2FA hashé et sauvegardé pour:', admin.email);
 
-      // Envoyer la réponse avec le code en développement
+      // Envoyer la réponse immédiatement
       res.json({
-        message: emailSent ? 'Code de vérification envoyé' : 'Code de vérification généré',
         requireTwoFactor: true,
+        message: 'Code 2FA envoyé',
         testCode: process.env.NODE_ENV === 'development' ? twoFactorCode : undefined
       });
 
+      // Envoyer l'email après la réponse
+      await sendEmail(
+        admin.notificationEmail,
+        'Code de vérification CyberMathIA',
+        `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #4F46E5;">Connexion Admin CyberMathIA</h1>
+            <p>Voici votre code de vérification :</p>
+            <div style="background-color: #F3F4F6; padding: 20px; text-align: center; font-size: 24px; letter-spacing: 5px; margin: 20px 0;">
+              <strong>${twoFactorCode}</strong>
+            </div>
+            <p style="color: #666; font-size: 14px;">Ce code est valable pendant 5 minutes.</p>
+          </div>
+        `
+      );
+
     } catch (error) {
-      console.error('Erreur de connexion admin:', error);
+      console.error('Erreur détaillée de connexion admin:', error);
       res.status(500).json({ message: 'Erreur lors de la connexion' });
     }
   },
@@ -141,52 +168,58 @@ const adminController = {
   verifyTwoFactor: async (req, res) => {
     try {
       const { login, twoFactorCode } = req.body;
+      console.log('Vérification 2FA pour:', { login });
 
-      // Vérifier si un code existe pour ce login
-      const storedData = twoFactorCodes.get(login);
-      if (!storedData) {
-        return res.status(401).json({ message: 'Code expiré ou invalide' });
-      }
+      const admin = await User.findOne({ 
+        email: login,
+        role: 'admin'
+      });
 
-      // Vérifier le nombre de tentatives
-      if (storedData.attempts >= 3) {
-        twoFactorCodes.delete(login);
-        return res.status(401).json({ message: 'Trop de tentatives. Veuillez recommencer la connexion.' });
-      }
-
-      // Vérifier si le code n'a pas expiré (5 minutes)
-      if (Date.now() - storedData.timestamp > 5 * 60 * 1000) {
-        twoFactorCodes.delete(login);
-        return res.status(401).json({ message: 'Code expiré' });
+      if (!admin || !admin.twoFactorCode) {
+        console.log('Admin non trouvé ou pas de code 2FA');
+        return res.status(401).json({ message: 'Code invalide' });
       }
 
       // Vérifier le code
-      if (storedData.code !== twoFactorCode) {
-        storedData.attempts++;
-        return res.status(401).json({ message: 'Code incorrect' });
+      const isValidCode = await bcrypt.compare(twoFactorCode, admin.twoFactorCode);
+      console.log('Résultat de la vérification du code:', isValidCode);
+
+      if (!isValidCode) {
+        console.log('Code 2FA invalide');
+        return res.status(401).json({ message: 'Code invalide' });
       }
 
-      // Récupérer l'utilisateur admin
-      const admin = await User.findOne({ email: 'admin@cybermathia.com', role: 'admin' });
-      
-      // Créer le token
+      // Effacer le code 2FA
+      admin.twoFactorCode = null;
+      await admin.save();
+
+      // Générer le token
       const token = jwt.sign(
         { userId: admin._id, role: 'admin' },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN }
+        { expiresIn: '24h' }
       );
 
-      // Supprimer le code 2FA utilisé
-      twoFactorCodes.delete(login);
+      // Logger la connexion
+      const loginLog = new LoginLog({
+        userId: admin._id,
+        userName: `${admin.firstName} ${admin.lastName}`,
+        role: 'admin',
+        ip: req.ip,
+        userAgent: req.headers['user-agent']
+      });
+      await loginLog.save();
+
+      console.log('Connexion admin réussie');
 
       res.json({
         token,
         user: {
           id: admin._id,
-          email: admin.email,
           firstName: admin.firstName,
           lastName: admin.lastName,
-          role: 'admin'
+          email: admin.email,
+          role: admin.role
         }
       });
     } catch (error) {
@@ -195,147 +228,35 @@ const adminController = {
     }
   },
 
-  // Récupérer les statistiques
-  getStats: async (req, res) => {
-    try {
-      console.log('Récupération des statistiques...');
-      const stats = {
-        totalUsers: await User.countDocuments(),
-        totalTeachers: await User.countDocuments({ role: 'teacher' }),
-        totalStudents: await User.countDocuments({ role: 'student' }),
-        totalParents: await User.countDocuments({ role: 'parent' }),
-        totalManagers: await User.countDocuments({ role: 'manager' })
-      };
-      console.log('Statistiques récupérées:', stats);
-      res.json(stats);
-    } catch (error) {
-      console.error('Erreur de récupération des stats:', error);
-      res.status(500).json({ message: 'Erreur lors de la récupération des statistiques' });
-    }
+  getStats: async () => {
+    const stats = {
+      totalUsers: await User.countDocuments(),
+      totalTeachers: await User.countDocuments({ role: 'teacher' }),
+      totalStudents: await User.countDocuments({ role: 'student' }),
+      totalParents: await User.countDocuments({ role: 'parent' }),
+      totalManagers: await User.countDocuments({ role: 'manager' })
+    };
+    return stats;
   },
 
-  // Récupérer les connexions récentes
-  getConnections: async (req, res) => {
-    try {
-      const connections = await LoginLog.find()
-        .sort({ timestamp: -1 })
-        .limit(20);
-      res.json(connections);
-    } catch (error) {
-      console.error('Erreur de récupération des connexions:', error);
-      res.status(500).json({ message: 'Erreur lors de la récupération des connexions' });
-    }
+  getConnections: async () => {
+    return await LoginLog.find().sort({ timestamp: -1 }).limit(100);
   },
 
-  // Récupérer les utilisateurs par rôle
-  getUsersByRole: async (req, res) => {
-    try {
-      const { role } = req.params;
-      console.log('Récupération des utilisateurs pour le rôle:', role);
-      
-      let users;
-      if (role === 'all') {
-        users = await User.find({}).sort({ createdAt: -1 });
-      } else {
-        users = await User.find({ role }).sort({ createdAt: -1 });
-      }
-
-      console.log(`Nombre d'utilisateurs trouvés: ${users.length}`);
-      res.json(users);
-    } catch (error) {
-      console.error('Erreur lors de la récupération des utilisateurs:', error);
-      res.status(500).json({ message: 'Erreur lors de la récupération des utilisateurs' });
-    }
+  getUsersByRole: async (role) => {
+    return await User.find({ role }).select('-password');
   },
 
-  // Créer un manager
-  createManager: async (req, res) => {
-    try {
-      const { firstName, lastName, email } = req.body;
-
-      // Vérifier si l'email existe déjà
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({ message: 'Cet email est déjà utilisé' });
-      }
-
-      // Générer un token d'invitation unique
-      const inviteToken = jwt.sign(
-        { email, role: 'manager', firstName, lastName },
-        process.env.JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-
-      // Envoyer l'email d'invitation
-      const inviteUrl = `http://localhost:3000/complete-registration?token=${inviteToken}`;
-      
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: 'Invitation à rejoindre CyberMathIA en tant que Manager',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #059669;">Bienvenue chez CyberMathIA !</h1>
-            <p>Bonjour ${firstName},</p>
-            <p>Vous avez été invité(e) à rejoindre l'équipe CyberMathIA en tant que Manager.</p>
-            <p>Pour finaliser la création de votre compte, veuillez cliquer sur le lien ci-dessous :</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${inviteUrl}" style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                Finaliser mon inscription
-              </a>
-            </div>
-            <p style="color: #666;">Ce lien expire dans 24 heures.</p>
-          </div>
-        `
-      });
-
-      res.status(200).json({
-        message: 'Invitation envoyée avec succès',
-        email
-      });
-    } catch (error) {
-      console.error('Erreur lors de la création du manager:', error);
-      res.status(500).json({ message: 'Erreur lors de l\'envoi de l\'invitation' });
-    }
+  createManager: async (managerData) => {
+    const manager = new User({
+      ...managerData,
+      role: 'manager'
+    });
+    return await manager.save();
   },
 
-  // Supprimer un utilisateur
-  deleteUser: async (req, res) => {
-    try {
-      const { userId } = req.params;
-      console.log('Tentative de suppression de l\'utilisateur:', userId);
-
-      // Vérifier que l'utilisateur existe
-      const user = await User.findById(userId);
-      if (!user) {
-        console.log('Utilisateur non trouvé');
-        return res.status(404).json({ message: 'Utilisateur non trouvé' });
-      }
-
-      // Empêcher la suppression d'un admin
-      if (user.role === 'admin') {
-        console.log('Tentative de suppression d\'un admin bloquée');
-        return res.status(403).json({ message: 'Impossible de supprimer un administrateur' });
-      }
-
-      // Si c'est un professeur, supprimer aussi ses disponibilités
-      if (user.role === 'teacher') {
-        console.log('Suppression des disponibilités du professeur');
-        await TeacherAvailability.deleteMany({ teacherId: userId });
-      }
-
-      // Supprimer l'utilisateur
-      await User.findByIdAndDelete(userId);
-      console.log('Utilisateur supprimé avec succès');
-
-      res.json({ message: 'Utilisateur supprimé avec succès' });
-    } catch (error) {
-      console.error('Erreur lors de la suppression:', error);
-      res.status(500).json({ 
-        message: 'Erreur lors de la suppression de l\'utilisateur',
-        error: error.message 
-      });
-    }
+  deleteUser: async (userId) => {
+    return await User.findByIdAndDelete(userId);
   }
 };
 
