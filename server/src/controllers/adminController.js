@@ -4,103 +4,26 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import nodemailer from 'nodemailer';
 
-// Configuration du transporteur email avec OAuth2
-const createTransporter = async () => {
-  try {
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
-      auth: {
-        user: 'noreply.cybermathia@gmail.com',
-        pass: 'zayf pfpp iatp dmwm'
-      },
-      tls: {
-        rejectUnauthorized: false,
-        ciphers: 'SSLv3'
-      }
-    });
+// Configuration du transporteur email
+const createTransporter = () => {
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // true pour 465, false pour les autres ports
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD
+    },
+    tls: {
+      rejectUnauthorized: false,
+      ciphers: 'SSLv3'
+    },
+    debug: true,
+    logger: true,
+    timeout: 10000 // timeout de 10 secondes
+  });
 
-    // Test de connexion
-    const testResult = await transporter.verify();
-    console.log('Test de connexion SMTP:', {
-      result: testResult,
-      host: 'smtp.gmail.com',
-      port: 587,
-      user: 'noreply.cybermathia@gmail.com'
-    });
-    
-    return transporter;
-  } catch (error) {
-    console.error('Erreur de configuration SMTP:', {
-      message: error.message,
-      code: error.code,
-      command: error.command,
-      response: error.response,
-      responseCode: error.responseCode,
-      stack: error.stack
-    });
-    return null;
-  }
-};
-
-// Fonction pour envoyer un email avec retry et plus de logs
-const sendEmail = async (to, subject, html, retryCount = 3) => {
-  for (let i = 0; i < retryCount; i++) {
-    try {
-      console.log(`Tentative d'envoi d'email (${i + 1}/${retryCount}) à ${to}`);
-      
-      const transporter = await createTransporter();
-      if (!transporter) {
-        throw new Error('Impossible de créer le transporteur SMTP');
-      }
-
-      const mailOptions = {
-        from: {
-          name: 'CyberMathIA',
-          address: 'noreply.cybermathia@gmail.com'
-        },
-        to,
-        subject,
-        html,
-        headers: {
-          'X-Priority': '1',
-          'X-MSMail-Priority': 'High',
-          'Importance': 'high'
-        }
-      };
-
-      console.log('Options du mail:', {
-        to: mailOptions.to,
-        subject: mailOptions.subject,
-        from: mailOptions.from
-      });
-
-      const info = await transporter.sendMail(mailOptions);
-
-      console.log('Email envoyé avec succès:', {
-        messageId: info.messageId,
-        response: info.response,
-        accepted: info.accepted,
-        rejected: info.rejected,
-        envelope: info.envelope
-      });
-      
-      return true;
-    } catch (error) {
-      console.error(`Erreur lors de la tentative ${i + 1}:`, {
-        error: error.message,
-        code: error.code,
-        command: error.command,
-        response: error.response,
-        stack: error.stack
-      });
-      
-      if (i === retryCount - 1) throw error;
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }
-  return false;
+  return transporter;
 };
 
 const adminController = {
@@ -119,45 +42,112 @@ const adminController = {
         return res.status(401).json({ message: 'Identifiants invalides' });
       }
 
+      console.log('Admin trouvé:', {
+        login: admin.email,
+        notificationEmail: admin.notificationEmail,
+        storedPassword: admin.password
+      });
+
       const isValidPassword = await bcrypt.compare(password, admin.password);
+      console.log('Résultat de la comparaison du mot de passe:', isValidPassword);
+
       if (!isValidPassword) {
         console.log('Mot de passe invalide pour:', login);
         return res.status(401).json({ message: 'Identifiants invalides' });
       }
 
-      // Générer un code 2FA aléatoire à 6 chiffres
+      // Générer un code 2FA
       const twoFactorCode = Math.floor(100000 + Math.random() * 900000).toString();
       console.log('Code 2FA généré:', twoFactorCode);
 
-      // Stocker le code hashé
+      // Hasher et sauvegarder le code
       const salt = await bcrypt.genSalt(10);
       const hashedCode = await bcrypt.hash(twoFactorCode, salt);
       admin.twoFactorCode = hashedCode;
       await admin.save();
-      console.log('Code 2FA hashé et sauvegardé pour:', admin.email);
 
-      // Envoyer la réponse immédiatement
-      res.json({
-        requireTwoFactor: true,
-        message: 'Code 2FA envoyé',
-        testCode: process.env.NODE_ENV === 'development' ? twoFactorCode : undefined
-      });
+      try {
+        console.log('Configuration email:', {
+          host: 'smtp.gmail.com',
+          port: 587,
+          user: process.env.EMAIL_USER,
+          hasPassword: !!process.env.EMAIL_PASSWORD
+        });
 
-      // Envoyer l'email après la réponse
-      await sendEmail(
-        admin.notificationEmail,
-        'Code de vérification CyberMathIA',
-        `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #4F46E5;">Connexion Admin CyberMathIA</h1>
-            <p>Voici votre code de vérification :</p>
-            <div style="background-color: #F3F4F6; padding: 20px; text-align: center; font-size: 24px; letter-spacing: 5px; margin: 20px 0;">
-              <strong>${twoFactorCode}</strong>
+        const transporter = createTransporter();
+        
+        // Vérifier la connexion SMTP avec timeout
+        const verifyPromise = transporter.verify();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout de vérification SMTP')), 5000)
+        );
+        
+        await Promise.race([verifyPromise, timeoutPromise]);
+        console.log('Connexion SMTP vérifiée');
+
+        // Envoyer l'email avec timeout
+        const mailOptions = {
+          from: {
+            name: 'CyberMathIA',
+            address: process.env.EMAIL_USER
+          },
+          to: admin.notificationEmail,
+          subject: 'Code de vérification CyberMathIA',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h1 style="color: #4F46E5;">Connexion Admin CyberMathIA</h1>
+              <p>Voici votre code de vérification :</p>
+              <div style="background-color: #F3F4F6; padding: 20px; text-align: center; font-size: 24px; letter-spacing: 5px; margin: 20px 0;">
+                <strong>${twoFactorCode}</strong>
+              </div>
+              <p style="color: #666; font-size: 14px;">Ce code est valable pendant 5 minutes.</p>
             </div>
-            <p style="color: #666; font-size: 14px;">Ce code est valable pendant 5 minutes.</p>
-          </div>
-        `
-      );
+          `
+        };
+
+        const sendMailPromise = transporter.sendMail(mailOptions);
+        const sendTimeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout d\'envoi d\'email')), 10000)
+        );
+
+        const info = await Promise.race([sendMailPromise, sendTimeoutPromise]);
+
+        console.log('Email envoyé:', {
+          messageId: info.messageId,
+          response: info.response,
+          accepted: info.accepted,
+          rejected: info.rejected
+        });
+
+        res.json({
+          requireTwoFactor: true,
+          message: 'Code 2FA envoyé',
+          testCode: process.env.NODE_ENV === 'development' ? twoFactorCode : undefined
+        });
+
+      } catch (emailError) {
+        console.error('Erreur détaillée d\'envoi d\'email:', {
+          message: emailError.message,
+          code: emailError.code,
+          command: emailError.command,
+          response: emailError.response,
+          stack: emailError.stack
+        });
+
+        // En développement, on continue même si l'email échoue
+        if (process.env.NODE_ENV === 'development') {
+          res.json({
+            requireTwoFactor: true,
+            message: 'Code 2FA généré (email désactivé en dev)',
+            testCode: twoFactorCode
+          });
+        } else {
+          res.status(500).json({ 
+            message: 'Erreur lors de l\'envoi du code de vérification',
+            error: emailError.message
+          });
+        }
+      }
 
     } catch (error) {
       console.error('Erreur détaillée de connexion admin:', error);
@@ -180,7 +170,6 @@ const adminController = {
         return res.status(401).json({ message: 'Code invalide' });
       }
 
-      // Vérifier le code
       const isValidCode = await bcrypt.compare(twoFactorCode, admin.twoFactorCode);
       console.log('Résultat de la vérification du code:', isValidCode);
 
@@ -189,18 +178,15 @@ const adminController = {
         return res.status(401).json({ message: 'Code invalide' });
       }
 
-      // Effacer le code 2FA
       admin.twoFactorCode = null;
       await admin.save();
 
-      // Générer le token
       const token = jwt.sign(
         { userId: admin._id, role: 'admin' },
         process.env.JWT_SECRET,
         { expiresIn: '24h' }
       );
 
-      // Logger la connexion
       const loginLog = new LoginLog({
         userId: admin._id,
         userName: `${admin.firstName} ${admin.lastName}`,

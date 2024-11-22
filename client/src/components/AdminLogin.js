@@ -17,8 +17,8 @@ const AdminLogin = () => {
     setLoading(true);
 
     try {
-      // Première étape : vérification des identifiants
       if (!showTwoFactor) {
+        // Première étape : vérification des identifiants
         console.log('Envoi des identifiants admin:', { login });
         const response = await axios.post('http://localhost:5000/api/admin/login', {
           login,
@@ -32,10 +32,9 @@ const AdminLogin = () => {
           setLoading(false);
           return;
         }
-      }
-      // Deuxième étape : vérification du code 2FA
-      else {
-        console.log('Envoi du code 2FA admin');
+      } else {
+        // Deuxième étape : vérification du code 2FA
+        console.log('Envoi du code 2FA');
         const response = await axios.post('http://localhost:5000/api/admin/verify-2fa', {
           login,
           twoFactorCode

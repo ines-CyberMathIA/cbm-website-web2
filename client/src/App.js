@@ -36,7 +36,7 @@ function App() {
       const userStr = localStorage.getItem('user');
       if (!userStr) return null;
       const user = JSON.parse(userStr);
-      return user.role || null;  // Retourner null si pas de rôle
+      return user.role || null;
     } catch {
       return null;
     }
@@ -65,6 +65,7 @@ function App() {
             <Register />
           } />
           
+          {/* Route de login admin */}
           <Route path="/admin/login" element={
             isAuthenticated() && getUserRole() === 'admin' ? 
             <Navigate to="/admin/dashboard" replace /> : 
