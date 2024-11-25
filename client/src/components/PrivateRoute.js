@@ -8,6 +8,9 @@ const PrivateRoute = ({ children }) => {
   // Si pas de token ou pas d'utilisateur, rediriger vers la page de connexion
   if (!token || !userStr) {
     console.log('Pas de token ou pas d\'utilisateur, redirection vers /login');
+    // Nettoyer le localStorage
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     return <Navigate to="/login" replace />;
   }
 
@@ -19,7 +22,7 @@ const PrivateRoute = ({ children }) => {
     const path = window.location.pathname;
     const correctPath = `/${user.role}/dashboard`;
 
-    if (!path.startsWith(correctPath)) {
+    if (!path.includes(`/${user.role}/`)) {
       console.log(`Redirection vers le dashboard ${user.role}`);
       return <Navigate to={correctPath} replace />;
     }

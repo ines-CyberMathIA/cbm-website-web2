@@ -18,14 +18,25 @@ function App() {
       const userStr = localStorage.getItem('user');
       
       if (!token || !userStr) {
+        console.log('Pas de token ou pas d\'utilisateur');
         return false;
       }
 
       const user = JSON.parse(userStr);
-      return !!(user && user.role);
+      if (!user || !user.role || !user.id) {
+        console.log('Données utilisateur invalides');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        return false;
+      }
+
+      // Vérifier que le token n'est pas expiré (si vous avez un timestamp)
+      return true;
 
     } catch (error) {
       console.error('Erreur de vérification d\'authentification:', error);
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
       return false;
     }
   };
@@ -48,9 +59,20 @@ function App() {
         <Routes>
           {/* Routes publiques */}
           <Route path="/" element={
-            isAuthenticated() && getUserRole() ? 
-            <Navigate to={`/${getUserRole()}/dashboard`} replace /> : 
-            <HeroSection />
+            (() => {
+              console.log('Rendu de la route racine');
+              const authenticated = isAuthenticated();
+              const role = getUserRole();
+              console.log('État auth:', { authenticated, role });
+              
+              if (authenticated && role) {
+                console.log('Redirection vers dashboard:', role);
+                return <Navigate to={`/${role}/dashboard`} replace />;
+              }
+              
+              console.log('Affichage HeroSection');
+              return <HeroSection />;
+            })()
           } />
           
           <Route path="/login" element={
