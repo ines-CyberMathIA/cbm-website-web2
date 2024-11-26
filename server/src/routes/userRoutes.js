@@ -107,14 +107,25 @@ router.post('/check-email', async (req, res) => {
 router.post('/verify-manager-token', async (req, res) => {
   try {
     const { token } = req.body;
+    console.log('Vérification du token manager:', token);
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('Token décodé:', decoded);
+
+    // Accéder aux données dans la structure correcte
+    const { firstName, lastName, email } = decoded.data;
+
     res.json({
-      firstName: decoded.firstName,
-      lastName: decoded.lastName,
-      email: decoded.email
+      firstName,
+      lastName,
+      email
     });
   } catch (error) {
-    res.status(401).json({ message: 'Token invalide ou expiré' });
+    console.error('Erreur de vérification du token:', error);
+    res.status(401).json({ 
+      message: 'Token invalide ou expiré',
+      details: error.message 
+    });
   }
 });
 
@@ -122,22 +133,39 @@ router.post('/verify-manager-token', async (req, res) => {
 router.post('/complete-manager-registration', async (req, res) => {
   try {
     const { token, password } = req.body;
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('Finalisation inscription manager avec token');
 
-    // Créer le compte manager
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('Données décodées du token:', decoded);
+
+    // Accéder aux données dans la structure correcte
+    const { firstName, lastName, email, role } = decoded.data;
+
+    // Créer le compte manager avec les données du token
     const manager = new User({
-      firstName: decoded.firstName,
-      lastName: decoded.lastName,
-      email: decoded.email,
-      password: password,
-      role: 'manager'
+      firstName,
+      lastName,
+      email,
+      password,
+      role
     });
 
-    await manager.save();
+    console.log('Création du compte manager avec les données:', {
+      firstName: manager.firstName,
+      lastName: manager.lastName,
+      email: manager.email,
+      role: manager.role
+    });
+
+    const savedManager = await manager.save();
+    console.log('Manager sauvegardé avec succès:', {
+      id: savedManager._id,
+      email: savedManager.email
+    });
 
     // Générer le token de connexion
     const authToken = jwt.sign(
-      { userId: manager._id, role: 'manager' },
+      { userId: savedManager._id, role: 'manager' },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
@@ -145,15 +173,19 @@ router.post('/complete-manager-registration', async (req, res) => {
     res.json({
       token: authToken,
       user: {
-        id: manager._id,
-        firstName: manager.firstName,
-        lastName: manager.lastName,
-        email: manager.email,
-        role: manager.role
+        id: savedManager._id,
+        firstName: savedManager.firstName,
+        lastName: savedManager.lastName,
+        email: savedManager.email,
+        role: savedManager.role
       }
     });
   } catch (error) {
-    res.status(400).json({ message: 'Erreur lors de la création du compte' });
+    console.error('Erreur détaillée lors de la création du compte:', error);
+    res.status(400).json({ 
+      message: 'Erreur lors de la création du compte',
+      details: error.message
+    });
   }
 });
 

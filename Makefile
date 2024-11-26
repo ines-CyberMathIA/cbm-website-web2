@@ -15,6 +15,8 @@ install:
 	cd $(CLIENT_DIR) && npm install
 	@echo "Installation de @headlessui/react..."
 	cd $(CLIENT_DIR) && npm install @headlessui/react --save
+	@echo "Installation de framer-motion..."
+	cd $(CLIENT_DIR) && npm install framer-motion --save
 
 # Démarrage des services
 .PHONY: start
