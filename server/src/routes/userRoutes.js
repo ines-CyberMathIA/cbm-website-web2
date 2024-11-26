@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import authMiddleware from '../middleware/authMiddleware.js';
+import PendingManager from '../models/PendingManager.js';
 
 const router = express.Router();
 
@@ -112,6 +113,19 @@ router.post('/verify-manager-token', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('Token décodé:', decoded);
 
+    // Vérifier que l'invitation existe toujours dans la base de données
+    const pendingManager = await PendingManager.findOne({ 
+      email: decoded.data.email,
+      token: token 
+    });
+
+    if (!pendingManager) {
+      console.log('Invitation non trouvée ou annulée pour:', decoded.data.email);
+      return res.status(401).json({ 
+        message: 'Cette invitation n\'est plus valide ou a été annulée'
+      });
+    }
+
     // Accéder aux données dans la structure correcte
     const { firstName, lastName, email } = decoded.data;
 
@@ -138,10 +152,23 @@ router.post('/complete-manager-registration', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('Données décodées du token:', decoded);
 
+    // Vérifier que l'invitation existe toujours
+    const pendingManager = await PendingManager.findOne({ 
+      email: decoded.data.email,
+      token: token 
+    });
+
+    if (!pendingManager) {
+      console.log('Invitation non trouvée ou annulée pour:', decoded.data.email);
+      return res.status(401).json({ 
+        message: 'Cette invitation n\'est plus valide ou a été annulée'
+      });
+    }
+
     // Accéder aux données dans la structure correcte
     const { firstName, lastName, email, role } = decoded.data;
 
-    // Créer le compte manager avec les données du token
+    // Créer le compte manager
     const manager = new User({
       firstName,
       lastName,
@@ -150,18 +177,10 @@ router.post('/complete-manager-registration', async (req, res) => {
       role
     });
 
-    console.log('Création du compte manager avec les données:', {
-      firstName: manager.firstName,
-      lastName: manager.lastName,
-      email: manager.email,
-      role: manager.role
-    });
-
     const savedManager = await manager.save();
-    console.log('Manager sauvegardé avec succès:', {
-      id: savedManager._id,
-      email: savedManager.email
-    });
+
+    // Supprimer l'invitation en attente
+    await PendingManager.findByIdAndDelete(pendingManager._id);
 
     // Générer le token de connexion
     const authToken = jwt.sign(

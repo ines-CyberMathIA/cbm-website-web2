@@ -173,8 +173,10 @@ router.delete('/users/:userId', authMiddleware, adminMiddleware, async (req, res
 router.get('/pending-managers', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const pendingManagers = await PendingManager.find().sort({ createdAt: -1 });
+    console.log('Pending managers trouvés:', pendingManagers);
     res.json(pendingManagers);
   } catch (error) {
+    console.error('Erreur lors de la récupération des invitations:', error);
     res.status(500).json({ message: 'Erreur lors de la récupération des invitations' });
   }
 });
@@ -182,10 +184,65 @@ router.get('/pending-managers', authMiddleware, adminMiddleware, async (req, res
 // Annuler une invitation
 router.delete('/pending-managers/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    await PendingManager.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Invitation annulée avec succès' });
+    const pendingManager = await PendingManager.findById(req.params.id);
+    if (!pendingManager) {
+      return res.status(404).json({ message: 'Invitation non trouvée' });
+    }
+
+    // Supprimer l'invitation en utilisant deleteOne pour plus de fiabilité
+    const result = await PendingManager.deleteOne({ _id: req.params.id });
+    console.log('Résultat de la suppression:', result);
+
+    if (result.deletedCount === 0) {
+      console.error('Échec de la suppression de l\'invitation');
+      return res.status(500).json({ message: 'Échec de la suppression de l\'invitation' });
+    }
+
+    // Double vérification pour s'assurer que l'invitation est supprimée
+    const verifyDeletion = await PendingManager.findById(req.params.id);
+    if (verifyDeletion) {
+      // Si l'invitation existe encore, forcer la suppression
+      await PendingManager.deleteMany({ email: pendingManager.email });
+      console.log('Suppression forcée de toutes les invitations pour:', pendingManager.email);
+    }
+
+    // Envoyer un email d'annulation
+    try {
+      await transporter.sendMail({
+        from: {
+          name: 'CyberMathIA',
+          address: process.env.EMAIL_USER
+        },
+        to: pendingManager.email,
+        subject: 'Invitation CyberMathIA annulée',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #4F46E5;">Information CyberMathIA</h1>
+            <p>Bonjour ${pendingManager.firstName},</p>
+            <p>Votre invitation à rejoindre CyberMathIA en tant que Manager a été annulée.</p>
+            <p>Si vous pensez qu'il s'agit d'une erreur, veuillez contacter l'administrateur.</p>
+            <p style="color: #666;">Le lien d'activation précédemment envoyé n'est plus valide.</p>
+          </div>
+        `
+      });
+    } catch (emailError) {
+      console.error('Erreur lors de l\'envoi de l\'email d\'annulation:', emailError);
+      // On continue même si l'email échoue
+    }
+
+    // Rafraîchir la liste des invitations
+    const remainingInvitations = await PendingManager.find().sort({ createdAt: -1 });
+
+    res.json({ 
+      message: 'Invitation annulée avec succès',
+      remainingInvitations
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de l\'annulation de l\'invitation' });
+    console.error('Erreur lors de l\'annulation de l\'invitation:', error);
+    res.status(500).json({ 
+      message: 'Erreur lors de l\'annulation de l\'invitation',
+      error: error.message 
+    });
   }
 });
 

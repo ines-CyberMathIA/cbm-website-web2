@@ -6,13 +6,16 @@ const ManagersManagement = () => {
   const [managers, setManagers] = useState([]);
   const [pendingManagers, setPendingManagers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: ''
   });
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
 
   useEffect(() => {
     fetchManagers();
@@ -29,7 +32,7 @@ const ManagersManagement = () => {
       setManagers(response.data);
       setLoading(false);
     } catch (err) {
-      setError('Erreur lors du chargement des managers');
+      showTemporaryError('Erreur lors du chargement des managers');
       setLoading(false);
     }
   };
@@ -47,65 +50,86 @@ const ManagersManagement = () => {
     }
   };
 
+  // Fonction utilitaire pour afficher les messages de succès temporaires
+  const showSuccessNotification = (message) => {
+    const notification = document.createElement('div');
+    notification.className = `
+      fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50
+      transform transition-all duration-500 ease-out
+      flex items-center space-x-2
+      animate-slide-in-right
+    `;
+    
+    notification.innerHTML = `
+      <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+      </svg>
+      <span class="font-medium">${message}</span>
+    `;
+    
+    document.body.appendChild(notification);
+
+    // Animation de sortie
+    setTimeout(() => {
+      notification.classList.add('animate-slide-out-right');
+      setTimeout(() => {
+        notification.remove();
+      }, 500);
+    }, 3000);
+  };
+
+  // Fonction pour afficher une erreur temporaire
+  const showTemporaryError = (message) => {
+    setErrorMessage(message);
+    setTimeout(() => {
+      setErrorMessage(null);
+    }, 3000);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
     try {
       const token = localStorage.getItem('token');
-      console.log('Envoi de la requête de création de manager:', formData);
-      
-      const response = await axios.post(
+      await axios.post(
         'http://localhost:5000/api/admin/create-manager',
         formData,
-        { 
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          } 
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      console.log('Réponse du serveur:', response.data);
+      // Fermer la modale et réinitialiser le formulaire
       setShowAddForm(false);
       setFormData({ firstName: '', lastName: '', email: '' });
-      fetchManagers();
-    } catch (err) {
-      console.error('Erreur lors de la création du manager:', err);
-      setError(err.response?.data?.message || 'Erreur lors de la création du manager');
-    }
-  };
-
-  const handleDeleteManager = async (managerId) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce manager ?')) return;
-    
-    try {
-      const token = localStorage.getItem('token');
-      await axios.delete(
-        `http://localhost:5000/api/admin/users/${managerId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      fetchManagers();
-    } catch (err) {
-      setError('Erreur lors de la suppression du manager');
-    }
-  };
-
-  const handleCancelInvitation = async (invitationId) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir annuler cette invitation ?')) return;
-    
-    try {
-      const token = localStorage.getItem('token');
-      await axios.delete(
-        `http://localhost:5000/api/admin/pending-managers/${invitationId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
       
-      // Rafraîchir la liste des invitations
-      fetchPendingManagers();
-    } catch (error) {
-      console.error('Erreur lors de l\'annulation de l\'invitation:', error);
-      setError('Erreur lors de l\'annulation de l\'invitation');
+      // Rafraîchir les données immédiatement
+      await refreshData();
+      
+      // Afficher la notification de succès
+      showSuccessNotification(`Invitation envoyée avec succès à ${formData.email}`);
+
+    } catch (err) {
+      // En cas d'erreur, afficher l'erreur mais ne pas fermer la modale
+      showTemporaryError(err.response?.data?.message || 'Erreur lors de la création du manager');
     }
+  };
+
+  const handleCancelInvitation = (invitationId) => {
+    setPendingAction({
+      type: 'cancel',
+      id: invitationId,
+      title: "Annuler l'invitation",
+      message: "Êtes-vous sûr de vouloir annuler cette invitation ? Un email sera envoyé pour informer la personne."
+    });
+    setShowConfirmModal(true);
+  };
+
+  const handleDeleteManager = (managerId) => {
+    setPendingAction({
+      type: 'delete',
+      id: managerId,
+      title: "Supprimer le manager",
+      message: "Êtes-vous sûr de vouloir supprimer ce manager ? Cette action est irréversible."
+    });
+    setShowConfirmModal(true);
   };
 
   const handleResendInvitation = async (invitationId) => {
@@ -128,9 +152,144 @@ const ManagersManagement = () => {
       }, 3000);
     } catch (error) {
       console.error('Erreur lors du renvoi de l\'invitation:', error);
-      setError('Erreur lors du renvoi de l\'invitation');
+      showTemporaryError('Erreur lors du renvoi de l\'invitation');
     }
   };
+
+  const handleConfirmAction = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        showTemporaryError('Session expirée, veuillez vous reconnecter');
+        return;
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      // Fermer la modal immédiatement
+      setShowConfirmModal(false);
+      setPendingAction(null);
+      
+      if (pendingAction.type === 'cancel') {
+        await axios.delete(
+          `http://localhost:5000/api/admin/pending-managers/${pendingAction.id}`,
+          { headers }
+        );
+        await refreshData();
+        showSuccessNotification("L'invitation a été annulée avec succès");
+      } else if (pendingAction.type === 'delete') {
+        await axios.delete(
+          `http://localhost:5000/api/admin/users/${pendingAction.id}`,
+          { headers }
+        );
+        await refreshData();
+        showSuccessNotification("Le manager a été supprimé avec succès");
+      }
+    } catch (error) {
+      showTemporaryError(
+        error.response?.data?.message || 
+        `Erreur lors de ${pendingAction.type === 'cancel' ? "l'annulation" : 'la suppression'}`
+      );
+    }
+  };
+
+  const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4"
+          >
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
+            <p className="text-gray-600 mb-6">{message}</p>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={onConfirm}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+              >
+                Confirmer
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  // Améliorer la fonction refreshData pour être plus robuste
+  const refreshData = async () => {
+    setIsRefreshing(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        showTemporaryError('Session expirée, veuillez vous reconnecter');
+        return;
+      }
+
+      const headers = { Authorization: `Bearer ${token}` };
+
+      // Récupérer les données en parallèle
+      const [managersResponse, pendingResponse] = await Promise.all([
+        axios.get('http://localhost:5000/api/admin/users/manager', { headers }),
+        axios.get('http://localhost:5000/api/admin/pending-managers', { headers })
+      ]);
+
+      console.log('Managers actifs reçus:', managersResponse.data);
+      console.log('Invitations en attente reçues:', pendingResponse.data);
+
+      // Mettre à jour les états avec les nouvelles données
+      setManagers(managersResponse.data || []);
+      setPendingManagers(pendingResponse.data || []);
+
+      // Vérifier si les données ont été mises à jour
+      console.log('État managers mis à jour:', managersResponse.data);
+      console.log('État pendingManagers mis à jour:', pendingResponse.data);
+
+      // Forcer le re-rendu du composant
+      setIsRefreshing(false);
+      showSuccessNotification(`${pendingResponse.data.length} invitation(s) en attente trouvée(s)`);
+
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement des données:', error);
+      showTemporaryError('Erreur lors du rafraîchissement des données');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Ajouter un useEffect pour surveiller les changements de pendingManagers
+  useEffect(() => {
+    console.log('pendingManagers a changé:', pendingManagers);
+  }, [pendingManagers]);
+
+  // Rafraîchir les données au chargement initial du composant
+  useEffect(() => {
+    refreshData();
+  }, []);
+
+  // Rafraîchir les données toutes les 30 secondes
+  useEffect(() => {
+    const interval = setInterval(refreshData, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (loading) return (
     <div className="flex justify-center items-center h-full">
@@ -150,15 +309,39 @@ const ManagersManagement = () => {
         </button>
       </div>
 
-      {error && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded-r">
-          {error}
-        </div>
-      )}
+      {/* Bouton de rafraîchissement déplacé ici */}
+      <div className="mb-4">
+        <button
+          onClick={refreshData}
+          disabled={isRefreshing}
+          className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 focus:outline-none flex items-center space-x-2 bg-white rounded-lg shadow-sm hover:shadow transition-all duration-300"
+        >
+          {isRefreshing ? (
+            <>
+              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Rafraîchissement...</span>
+            </>
+          ) : (
+            <>
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>Rafraîchir les données</span>
+            </>
+          )}
+        </button>
+      </div>
 
-      {pendingManagers.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Invitations en attente</h2>
+      {/* Section des invitations en attente */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+          Invitations en attente ({pendingManagers.length})
+        </h2>
+        
+        {pendingManagers.length > 0 ? (
           <div className="bg-white shadow-sm rounded-lg overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -224,8 +407,12 @@ const ManagersManagement = () => {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="bg-gray-50 rounded-lg p-4 text-gray-500 text-center">
+            Aucune invitation en attente
+          </div>
+        )}
+      </div>
 
       <AnimatePresence>
         {showAddForm && (
@@ -301,16 +488,20 @@ const ManagersManagement = () => {
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => setShowAddForm(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setFormData({ firstName: '', lastName: '', email: '' });
+                      setErrorMessage(null);
+                    }}
+                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
                   >
                     Annuler
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-200"
+                    className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700"
                   >
-                    Créer le manager
+                    Inviter
                   </button>
                 </div>
               </form>
@@ -370,6 +561,34 @@ const ManagersManagement = () => {
           </tbody>
         </table>
       </div>
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => {
+          setShowConfirmModal(false);
+          setPendingAction(null);
+        }}
+        onConfirm={handleConfirmAction}
+        title={pendingAction?.title}
+        message={pendingAction?.message}
+      />
+
+      {/* Message d'erreur avec animation */}
+      <AnimatePresence>
+        {errorMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{errorMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
