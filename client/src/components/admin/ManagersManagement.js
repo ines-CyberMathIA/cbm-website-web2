@@ -88,26 +88,28 @@ const ManagersManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Sauvegarder les données du formulaire avant de le réinitialiser
+    const submittedData = { ...formData };
+    
+    // Fermer la modale et réinitialiser le formulaire immédiatement
+    setShowAddForm(false);
+    setFormData({ firstName: '', lastName: '', email: '' });
+
     try {
       const token = localStorage.getItem('token');
       await axios.post(
         'http://localhost:5000/api/admin/create-manager',
-        formData,
+        submittedData,  // Utiliser les données sauvegardées
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      // Fermer la modale et réinitialiser le formulaire
-      setShowAddForm(false);
-      setFormData({ firstName: '', lastName: '', email: '' });
       
-      // Rafraîchir les données immédiatement
+      // Rafraîchir les données et afficher la notification de succès
       await refreshData();
-      
-      // Afficher la notification de succès
-      showSuccessNotification(`Invitation envoyée avec succès à ${formData.email}`);
+      showSuccessNotification(`Invitation envoyée avec succès à ${submittedData.email}`);
 
     } catch (err) {
-      // En cas d'erreur, afficher l'erreur mais ne pas fermer la modale
+      // En cas d'erreur, afficher l'erreur sans rouvrir la modale
       showTemporaryError(err.response?.data?.message || 'Erreur lors de la création du manager');
     }
   };
