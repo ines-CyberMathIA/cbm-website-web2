@@ -10,6 +10,7 @@ import ManagerDashboard from './components/ManagerDashboard';
 import HeroSection from './components/HeroSection';
 import PrivateRoute from './components/PrivateRoute';
 import CompleteManagerRegistration from './components/CompleteManagerRegistration';
+import CompleteTeacherRegistration from './components/CompleteTeacherRegistration';
 
 function App() {
   // Vérifier si l'utilisateur est connecté avec un token valide
@@ -99,6 +100,12 @@ function App() {
           <Route 
             path="/complete-manager-registration" 
             element={<CompleteManagerRegistration />} 
+          />
+          
+          {/* Route pour la finalisation d'inscription professeur */}
+          <Route 
+            path="/complete-teacher-registration" 
+            element={<CompleteTeacherRegistration />} 
           />
           
           {/* Routes protégées */}

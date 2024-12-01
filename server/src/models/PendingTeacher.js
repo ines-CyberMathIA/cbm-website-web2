@@ -30,7 +30,8 @@ const pendingTeacherSchema = new mongoose.Schema({
   },
   token: {
     type: String,
-    required: true
+    required: true,
+    unique: true
   },
   createdAt: {
     type: Date,
@@ -38,5 +39,26 @@ const pendingTeacherSchema = new mongoose.Schema({
     expires: 86400 // Le document s'auto-supprime après 24h
   }
 });
+
+// Méthode statique pour vérifier un token
+pendingTeacherSchema.statics.findByToken = async function(token) {
+  try {
+    const pendingTeacher = await this.findOne({ token });
+    if (!pendingTeacher) return null;
+
+    // Vérifier si l'invitation n'a pas expiré
+    const now = new Date();
+    const expiryDate = new Date(pendingTeacher.createdAt.getTime() + 24*60*60*1000);
+    if (now > expiryDate) {
+      await this.deleteOne({ _id: pendingTeacher._id });
+      return null;
+    }
+
+    return pendingTeacher;
+  } catch (error) {
+    console.error('Erreur lors de la vérification du token:', error);
+    return null;
+  }
+};
 
 export default mongoose.model('PendingTeacher', pendingTeacherSchema); 

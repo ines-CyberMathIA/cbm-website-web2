@@ -38,13 +38,12 @@ transporter.verify(function(error, success) {
 router.get('/my-teachers', authMiddleware, async (req, res) => {
   try {
     console.log('Recherche des professeurs pour le manager:', {
-      managerId: req.user._id,
-      managerEmail: req.user.email
+      managerId: req.user.userId
     });
     
     // Récupérer les professeurs actifs
     const activeTeachers = await User.find({ 
-      createdBy: req.user._id,
+      createdBy: req.user.userId,
       role: 'teacher'
     }).select('-password');
 
@@ -59,7 +58,7 @@ router.get('/my-teachers', authMiddleware, async (req, res) => {
 
     // Récupérer les invitations en attente
     const pendingTeachers = await PendingTeacher.find({
-      managerId: req.user._id
+      managerId: req.user.userId
     });
 
     console.log('Invitations en attente trouvées:', {
@@ -114,9 +113,14 @@ router.post('/create-teacher', authMiddleware, async (req, res) => {
   try {
     const { firstName, lastName, email, speciality, level } = req.body;
     
+    // Récupérer le token actuel
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ message: 'Token manquant' });
+    }
+
     console.log('Création de professeur par le manager:', {
-      managerId: req.user._id,
-      managerEmail: req.user.email,
+      managerId: req.user.userId,
       teacherData: { firstName, lastName, email, speciality, level }
     });
 
@@ -164,13 +168,13 @@ router.post('/create-teacher', authMiddleware, async (req, res) => {
     // Générer le token
     const inviteToken = jwt.sign(
       { 
-        email, 
-        role: 'teacher', 
         firstName, 
-        lastName,
+        lastName, 
+        email,
+        role: 'teacher',
         speciality: speciality || 'mathematics',
         level: level || ['college'],
-        createdBy: req.user._id
+        createdBy: req.user.userId
       },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
@@ -183,7 +187,7 @@ router.post('/create-teacher', authMiddleware, async (req, res) => {
       email,
       speciality: speciality || 'mathematics',
       level: level || ['college'],
-      managerId: req.user._id,
+      managerId: req.user.userId,
       token: inviteToken
     });
 
@@ -196,8 +200,8 @@ router.post('/create-teacher', authMiddleware, async (req, res) => {
       lastName,
       speciality: speciality || 'mathematics',
       level: level || ['college'],
-      createdBy: req.user._id,
-      managerId: req.user._id,
+      createdBy: req.user.userId,
+      managerId: req.user.userId,
       managerEmail: req.user.email
     });
 
@@ -253,7 +257,8 @@ router.post('/create-teacher', authMiddleware, async (req, res) => {
           id: pendingTeacher._id,
           email: pendingTeacher.email,
           expiresAt: new Date(pendingTeacher.createdAt.getTime() + 24*60*60*1000)
-        }
+        },
+        token: token
       });
     } catch (emailError) {
       console.error('Erreur détaillée lors de l\'envoi de l\'email:', {
@@ -378,6 +383,127 @@ router.put('/messages/:teacherId/read', authMiddleware, async (req, res) => {
     res.json({ message: 'Messages marqués comme lus' });
   } catch (error) {
     res.status(500).json({ message: 'Erreur lors de la mise à jour des messages' });
+  }
+});
+
+// Ajouter cette route pour renvoyer une invitation
+router.post('/resend-invitation/:teacherId', authMiddleware, async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    
+    // Récupérer l'invitation en attente
+    const pendingTeacher = await PendingTeacher.findOne({
+      _id: teacherId,
+      managerId: req.user.userId
+    });
+
+    if (!pendingTeacher) {
+      return res.status(404).json({ message: 'Invitation non trouvée' });
+    }
+
+    // Générer un nouveau token
+    const inviteToken = jwt.sign(
+      { 
+        email: pendingTeacher.email, 
+        role: 'teacher', 
+        firstName: pendingTeacher.firstName, 
+        lastName: pendingTeacher.lastName,
+        speciality: pendingTeacher.speciality,
+        level: pendingTeacher.level,
+        createdBy: req.user.userId
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    // Mettre à jour le token dans l'invitation
+    pendingTeacher.token = inviteToken;
+    await pendingTeacher.save();
+
+    // Générer le lien d'invitation
+    const inviteUrl = `http://localhost:3000/complete-teacher-registration?token=${inviteToken}`;
+
+    // Envoyer le nouvel email
+    await transporter.sendMail({
+      from: {
+        name: 'CyberMathIA',
+        address: process.env.EMAIL_USER
+      },
+      to: pendingTeacher.email,
+      subject: 'Nouvelle invitation à rejoindre CyberMathIA en tant que Professeur',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #4F46E5;">Bienvenue chez CyberMathIA !</h1>
+          <p>Bonjour ${pendingTeacher.firstName},</p>
+          <p>Voici un nouveau lien pour finaliser la création de votre compte professeur :</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${inviteUrl}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Finaliser mon inscription
+            </a>
+          </div>
+          <p style="color: #666;">Ce lien expire dans 24 heures.</p>
+        </div>
+      `
+    });
+
+    res.json({ 
+      message: 'Invitation renvoyée avec succès',
+      email: pendingTeacher.email
+    });
+
+  } catch (error) {
+    console.error('Erreur lors du renvoi de l\'invitation:', error);
+    res.status(500).json({ 
+      message: 'Erreur lors du renvoi de l\'invitation',
+      details: error.message 
+    });
+  }
+});
+
+// Ajouter cette route pour annuler une invitation
+router.delete('/cancel-invitation/:teacherId', authMiddleware, async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    
+    const pendingTeacher = await PendingTeacher.findOne({
+      _id: teacherId,
+      managerId: req.user.userId
+    });
+
+    if (!pendingTeacher) {
+      return res.status(404).json({ message: 'Invitation non trouvée' });
+    }
+
+    // Envoyer un email d'annulation
+    await transporter.sendMail({
+      from: {
+        name: 'CyberMathIA',
+        address: process.env.EMAIL_USER
+      },
+      to: pendingTeacher.email,
+      subject: 'Annulation de votre invitation CyberMathIA',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #4F46E5;">Information importante</h1>
+          <p>Bonjour ${pendingTeacher.firstName},</p>
+          <p>Nous vous informons que votre invitation à rejoindre CyberMathIA a été annulée.</p>
+          <p>Le lien d'activation précédent n'est plus valide.</p>
+          <p style="color: #666;">Si vous pensez qu'il s'agit d'une erreur, veuillez contacter votre manager.</p>
+        </div>
+      `
+    });
+
+    // Supprimer l'invitation
+    await PendingTeacher.deleteOne({ _id: teacherId });
+
+    res.json({ message: 'Invitation annulée avec succès' });
+
+  } catch (error) {
+    console.error('Erreur lors de l\'annulation de l\'invitation:', error);
+    res.status(500).json({ 
+      message: 'Erreur lors de l\'annulation de l\'invitation',
+      details: error.message 
+    });
   }
 });
 

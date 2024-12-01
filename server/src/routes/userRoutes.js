@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import PendingManager from '../models/PendingManager.js';
+import PendingTeacher from '../models/PendingTeacher.js';
 
 const router = express.Router();
 
@@ -203,16 +204,25 @@ router.post('/verify-teacher-token', async (req, res) => {
     const { token } = req.body;
     console.log('Token reçu:', token);
 
+    // Vérifier que l'invitation existe toujours
+    const pendingTeacher = await PendingTeacher.findByToken(token);
+    if (!pendingTeacher) {
+      return res.status(401).json({ 
+        message: 'Cette invitation n\'est plus valide ou a été annulée'
+      });
+    }
+
+    // Décoder le token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('Token décodé:', decoded);
 
     res.json({
-      firstName: decoded.firstName,
-      lastName: decoded.lastName,
-      email: decoded.email,
-      speciality: decoded.speciality,
-      level: decoded.level,
-      createdBy: decoded.createdBy
+      firstName: pendingTeacher.firstName,
+      lastName: pendingTeacher.lastName,
+      email: pendingTeacher.email,
+      speciality: pendingTeacher.speciality,
+      level: pendingTeacher.level,
+      createdBy: pendingTeacher.managerId
     });
   } catch (error) {
     console.error('Erreur de vérification du token:', error);
@@ -229,40 +239,30 @@ router.post('/complete-teacher-registration', async (req, res) => {
     const { token, password } = req.body;
     console.log('Finalisation inscription professeur avec token');
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('Données décodées du token:', {
-      ...decoded,
-      createdBy: decoded.createdBy
-    });
+    // Vérifier que l'invitation existe toujours
+    const pendingTeacher = await PendingTeacher.findByToken(token);
+    if (!pendingTeacher) {
+      return res.status(401).json({ 
+        message: 'Cette invitation n\'est plus valide ou a été annulée'
+      });
+    }
 
     // Créer le compte professeur
     const teacher = new User({
-      firstName: decoded.firstName,
-      lastName: decoded.lastName,
-      email: decoded.email,
+      firstName: pendingTeacher.firstName,
+      lastName: pendingTeacher.lastName,
+      email: pendingTeacher.email,
       password: password,
       role: 'teacher',
-      speciality: decoded.speciality || 'mathematics',
-      level: decoded.level || ['college'],
-      createdBy: decoded.createdBy
-    });
-
-    console.log('Création du compte professeur avec les données:', {
-      firstName: teacher.firstName,
-      lastName: teacher.lastName,
-      email: teacher.email,
-      role: teacher.role,
-      speciality: teacher.speciality,
-      level: teacher.level,
-      createdBy: teacher.createdBy
+      speciality: pendingTeacher.speciality,
+      level: pendingTeacher.level,
+      createdBy: pendingTeacher.managerId
     });
 
     const savedTeacher = await teacher.save();
-    console.log('Professeur sauvegardé avec succès:', {
-      id: savedTeacher._id,
-      email: savedTeacher.email,
-      createdBy: savedTeacher.createdBy
-    });
+
+    // Supprimer l'invitation en attente
+    await PendingTeacher.deleteOne({ _id: pendingTeacher._id });
 
     // Générer le token de connexion
     const authToken = jwt.sign(
@@ -284,11 +284,10 @@ router.post('/complete-teacher-registration', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Erreur détaillée lors de la création du compte:', error);
+    console.error('Erreur lors de la création du compte:', error);
     res.status(400).json({ 
       message: 'Erreur lors de la création du compte',
-      details: error.message,
-      stack: error.stack
+      details: error.message
     });
   }
 });

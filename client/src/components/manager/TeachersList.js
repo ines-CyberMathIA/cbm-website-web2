@@ -1,40 +1,141 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+// Fonction pour formater le temps restant
+const formatTimeLeft = (expiresAt) => {
+  const now = new Date();
+  const expiry = new Date(expiresAt);
+  const diff = expiry - now;
+  
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  
+  if (hours < 0 || minutes < 0) return 'Expiré';
+  return `${hours}h ${minutes}m`;
+};
+
+// Fonction pour formater la spécialité
+const formatSpeciality = (speciality) => {
+  const mapping = {
+    mathematics: 'Mathématiques',
+    physics: 'Physique',
+    chemistry: 'Chimie',
+    biology: 'Biologie',
+    computer_science: 'Informatique'
+  };
+  return mapping[speciality] || speciality;
+};
+
+// Fonction pour formater le niveau
+const formatLevel = (level) => {
+  const mapping = {
+    college: 'Collège',
+    lycee: 'Lycée',
+    superieur: 'Supérieur',
+    adulte: 'Adulte'
+  };
+  return mapping[level] || level;
+};
+
 const TeachersList = ({ onTeacherClick }) => {
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const fetchTeachers = async () => {
     try {
-      console.log('Récupération des professeurs...');
       const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Token manquant');
+      }
+
       const response = await axios.get('http://localhost:5000/api/manager/my-teachers', {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
-      console.log('Professeurs reçus:', response.data);
+
+      if (!response.data) {
+        throw new Error('Données invalides reçues du serveur');
+      }
+
       setTeachers(response.data);
+      setError(null);
+      setLoading(false);
     } catch (error) {
       console.error('Erreur lors de la récupération des professeurs:', error);
-      setError('Impossible de charger la liste des professeurs');
-    } finally {
-      setLoading(false);
+      
+      if (error.response?.status === 401) {
+        setError('Session expirée. Veuillez vous reconnecter.');
+        setLoading(false);
+        return;
+      }
+
+      if (retryCount < 3) {
+        setRetryCount(prev => prev + 1);
+        setTimeout(fetchTeachers, 2000);
+      } else {
+        setError('Impossible de charger la liste des professeurs');
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    // Charger initialement
     fetchTeachers();
 
-    // Rafraîchir toutes les 30 secondes
-    const interval = setInterval(fetchTeachers, 30000);
+    const interval = setInterval(() => {
+      setRetryCount(0);
+      fetchTeachers();
+    }, 5000);
 
-    // Nettoyer l'intervalle
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+    };
   }, []);
+
+  const handleResendInvitation = async (teacherId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `http://localhost:5000/api/manager/resend-invitation/${teacherId}`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      fetchTeachers();
+    } catch (error) {
+      setError('Erreur lors du renvoi de l\'invitation');
+    }
+  };
+
+  const handleCancelInvitation = async (teacherId) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir annuler cette invitation ?')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(
+        `http://localhost:5000/api/manager/cancel-invitation/${teacherId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      fetchTeachers();
+    } catch (error) {
+      setError('Erreur lors de l\'annulation de l\'invitation');
+    }
+  };
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError(null);
+    setRetryCount(0);
+    fetchTeachers();
+  };
 
   if (loading) {
     return (
@@ -46,100 +147,132 @@ const TeachersList = ({ onTeacherClick }) => {
 
   if (error) {
     return (
-      <div className="bg-red-50 border-l-4 border-red-400 p-4 text-red-700">
-        {error}
+      <div className="bg-red-50 border-l-4 border-red-400 p-4">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <p className="text-sm text-red-700">{error}</p>
+            <button
+              onClick={handleRetry}
+              className="mt-2 text-sm font-medium text-red-600 hover:text-red-500"
+            >
+              Réessayer
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white shadow rounded-lg">
-      <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
-        <h3 className="text-lg leading-6 font-medium text-gray-900">
-          Mes Professeurs
-        </h3>
-        <div className="flex items-center space-x-4">
-          <span className="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-green-100 text-green-800">
-            {teachers.filter(t => t.status === 'active').length} actif(s)
-          </span>
-          <span className="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-            {teachers.filter(t => t.status === 'pending').length} en attente
-          </span>
+    <div className="bg-white shadow-lg rounded-xl overflow-hidden">
+      <div className="px-6 py-5 border-b border-gray-200">
+        <div className="flex justify-between items-center">
+          <h3 className="text-xl font-semibold text-gray-900">
+            Mes Professeurs
+          </h3>
+          <div className="flex space-x-4">
+            <span className="px-4 py-2 rounded-full bg-green-100 text-green-800 text-sm font-medium">
+              {teachers.filter(t => t.status === 'active').length} actif(s)
+            </span>
+            <span className="px-4 py-2 rounded-full bg-yellow-100 text-yellow-800 text-sm font-medium">
+              {teachers.filter(t => t.status === 'pending').length} en attente
+            </span>
+          </div>
         </div>
       </div>
-      <div className="border-t border-gray-200">
-        {teachers.length === 0 ? (
-          <div className="p-4 text-center text-gray-500">
-            Aucun professeur pour le moment
-          </div>
-        ) : (
-          <ul className="divide-y divide-gray-200">
-            {teachers.map((teacher) => (
-              <li 
-                key={teacher._id} 
-                className="px-4 py-4 sm:px-6 hover:bg-gray-50 cursor-pointer"
-                onClick={() => onTeacherClick(teacher)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                        teacher.status === 'active' ? 'bg-green-100' : 'bg-yellow-100'
-                      }`}>
-                        <span className={`font-medium ${
-                          teacher.status === 'active' ? 'text-green-800' : 'text-yellow-800'
-                        }`}>
-                          {teacher.firstName[0]}{teacher.lastName[0]}
-                        </span>
+
+      {teachers.length === 0 ? (
+        <div className="p-8 text-center text-gray-500">
+          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">Aucun professeur</h3>
+          <p className="mt-1 text-sm text-gray-500">Commencez par inviter un professeur à rejoindre votre équipe.</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-200">
+          {/* Section des invitations en attente */}
+          {teachers.filter(t => t.status === 'pending').length > 0 && (
+            <div className="p-6">
+              <h4 className="text-sm font-medium text-gray-500 mb-4">Invitations en attente</h4>
+              <div className="space-y-4">
+                {teachers.filter(t => t.status === 'pending').map((teacher) => (
+                  <div key={teacher._id} className="bg-yellow-50 rounded-lg p-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h5 className="text-sm font-medium text-gray-900">
+                          {teacher.firstName} {teacher.lastName}
+                        </h5>
+                        <p className="text-sm text-gray-500">{teacher.email}</p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Expire dans: {formatTimeLeft(teacher.expiresAt)}
+                        </p>
                       </div>
-                    </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">
-                        {teacher.firstName} {teacher.lastName}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {teacher.email}
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        Spécialité: {teacher.speciality}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm text-gray-500">
-                      Créé le {new Date(teacher.createdAt).toLocaleDateString('fr-FR')}
-                    </div>
-                    {teacher.status === 'pending' && (
-                      <div className="flex items-center space-x-2">
-                        <div className="text-xs text-yellow-600">
-                          Expire le {new Date(teacher.expiresAt).toLocaleString('fr-FR')}
-                        </div>
+                      <div className="flex space-x-3">
                         <button
-                          onClick={async () => {
-                            try {
-                              const token = localStorage.getItem('token');
-                              await axios.delete(`http://localhost:5000/api/manager/pending-teachers/${teacher._id}`, {
-                                headers: { Authorization: `Bearer ${token}` }
-                              });
-                              // Rafraîchir la liste
-                              fetchTeachers();
-                            } catch (error) {
-                              console.error('Erreur lors de la suppression de l\'invitation:', error);
-                            }
-                          }}
-                          className="text-xs text-red-600 hover:text-red-800"
+                          onClick={() => handleResendInvitation(teacher._id)}
+                          className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200"
                         >
-                          Annuler l'invitation
+                          Renvoyer
+                        </button>
+                        <button
+                          onClick={() => handleCancelInvitation(teacher._id)}
+                          className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200"
+                        >
+                          Annuler
                         </button>
                       </div>
-                    )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Section des professeurs actifs */}
+          <div className="p-6">
+            <h4 className="text-sm font-medium text-gray-500 mb-4">Professeurs actifs</h4>
+            <div className="space-y-4">
+              {teachers.filter(t => t.status === 'active').map((teacher) => (
+                <div
+                  key={teacher._id}
+                  onClick={() => onTeacherClick(teacher)}
+                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                >
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h5 className="text-sm font-medium text-gray-900">
+                        {teacher.firstName} {teacher.lastName}
+                      </h5>
+                      <p className="text-sm text-gray-500">{teacher.email}</p>
+                      <div className="flex mt-2 space-x-2">
+                        {teacher.speciality && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {formatSpeciality(teacher.speciality)}
+                          </span>
+                        )}
+                        {teacher.level?.map((lvl) => (
+                          <span key={lvl} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            {formatLevel(lvl)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                   </div>
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
