@@ -108,31 +108,20 @@ router.post('/check-email', async (req, res) => {
 router.post('/verify-manager-token', async (req, res) => {
   try {
     const { token } = req.body;
-    console.log('Vérification du token manager:', token);
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('Token décodé:', decoded);
-
-    // Vérifier que l'invitation existe toujours dans la base de données
-    const pendingManager = await PendingManager.findOne({ 
-      email: decoded.data.email,
-      token: token 
-    });
-
+    
+    // Vérifier que l'invitation est toujours valide
+    const pendingManager = await PendingManager.verifyToken(token);
     if (!pendingManager) {
-      console.log('Invitation non trouvée ou annulée pour:', decoded.data.email);
       return res.status(401).json({ 
-        message: 'Cette invitation n\'est plus valide ou a été annulée'
+        message: 'Ce lien d\'invitation n\'est plus valide ou a été annulé'
       });
     }
 
-    // Accéder aux données dans la structure correcte
-    const { firstName, lastName, email } = decoded.data;
-
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     res.json({
-      firstName,
-      lastName,
-      email
+      firstName: decoded.data.firstName,
+      lastName: decoded.data.lastName,
+      email: decoded.data.email
     });
   } catch (error) {
     console.error('Erreur de vérification du token:', error);

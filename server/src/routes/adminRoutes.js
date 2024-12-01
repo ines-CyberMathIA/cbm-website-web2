@@ -9,28 +9,89 @@ import PendingManager from '../models/PendingManager.js';
 
 const router = express.Router();
 
-// Configuration du transporteur email avec plus d'options
+// Configuration du transporteur email avec Gmail
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
+  port: 587,
+  secure: false,
   auth: {
     user: 'noreply.cybermathia@gmail.com',
     pass: 'zayf pfpp iatp dmwm'
   },
-  debug: true,
-  logger: true
+  tls: {
+    rejectUnauthorized: false,
+    ciphers: 'SSLv3'
+  },
+  pool: true, // Utiliser un pool de connexions
+  maxConnections: 1,
+  maxMessages: 3,
+  rateDelta: 1000,
+  rateLimit: 3,
+  connectionTimeout: 5000, // 5 secondes
+  socketTimeout: 5000,
+  greetingTimeout: 5000
 });
 
-// Vérifier la configuration du transporteur au démarrage
-transporter.verify((error, success) => {
-  if (error) {
+// Fonction d'envoi d'email avec gestion des timeouts
+const sendMailWithRetry = async (mailOptions) => {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Timeout lors de l\'envoi de l\'email'));
+    }, 10000); // 10 secondes de timeout global
+
+    transporter.sendMail({
+      ...mailOptions,
+      from: {
+        name: 'CyberMathIA',
+        address: 'noreply.cybermathia@gmail.com'
+      }
+    })
+    .then((info) => {
+      clearTimeout(timeoutId);
+      console.log('Email envoyé avec succès:', {
+        messageId: info.messageId,
+        response: info.response
+      });
+      resolve(info);
+    })
+    .catch((error) => {
+      clearTimeout(timeoutId);
+      console.error('Erreur d\'envoi d\'email:', {
+        error: error.message,
+        code: error.code,
+        command: error.command
+      });
+      reject(error);
+    });
+  });
+};
+
+// Vérifier la connexion SMTP au démarrage
+const verifyConnection = async () => {
+  try {
+    await new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Timeout de vérification SMTP'));
+      }, 5000);
+
+      transporter.verify((error, success) => {
+        clearTimeout(timeoutId);
+        if (error) {
+          console.error('Erreur de configuration SMTP:', error);
+          reject(error);
+        } else {
+          console.log('Serveur SMTP prêt');
+          resolve(success);
+        }
+      });
+    });
+  } catch (error) {
     console.error('Erreur de configuration email:', error);
-  } else {
-    console.log('Serveur prêt à envoyer des emails');
   }
-});
+};
+
+// Vérifier la connexion au démarrage
+verifyConnection();
 
 // Routes publiques pour l'authentification admin
 router.post('/login', adminController.login);
@@ -106,11 +167,7 @@ router.post('/create-manager', authMiddleware, adminMiddleware, async (req, res)
     const activationLink = `http://localhost:3000/complete-manager-registration?token=${token}`;
     
     try {
-      await transporter.sendMail({
-        from: {
-          name: 'CyberMathIA',
-          address: process.env.EMAIL_USER
-        },
+      await sendMailWithRetry({
         to: email,
         subject: 'Invitation à rejoindre CyberMathIA en tant que Manager',
         html: `
@@ -141,6 +198,7 @@ router.post('/create-manager', authMiddleware, adminMiddleware, async (req, res)
         }
       });
     } catch (emailError) {
+      console.error('Erreur finale d\'envoi d\'email après plusieurs tentatives:', emailError);
       // Si l'email échoue, supprimer le pendingManager
       await PendingManager.findByIdAndDelete(pendingManager._id);
       
@@ -162,9 +220,35 @@ router.post('/create-manager', authMiddleware, adminMiddleware, async (req, res)
 
 router.delete('/users/:userId', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    await adminController.deleteUser(req.params.userId);
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    // Envoyer un email de notification
+    try {
+      await sendMailWithRetry({
+        to: user.email,
+        subject: 'Suppression de votre compte CyberMathIA',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #4F46E5;">Information importante</h1>
+            <p>Bonjour ${user.firstName},</p>
+            <p>Nous vous informons que votre compte CyberMathIA a été supprimé par l'administration.</p>
+            <p>Si vous pensez qu'il s'agit d'une erreur, veuillez nous contacter à l'adresse suivante : support@cybermathia.fr</p>
+            <p style="color: #666;">Cordialement,<br>L'équipe CyberMathIA</p>
+          </div>
+        `
+      });
+    } catch (emailError) {
+      console.error('Erreur lors de l\'envoi de l\'email de suppression:', emailError);
+      // On continue même si l'email échoue
+    }
+
+    await User.findByIdAndDelete(req.params.userId);
     res.json({ message: 'Utilisateur supprimé avec succès' });
   } catch (error) {
+    console.error('Erreur lors de la suppression:', error);
     res.status(500).json({ message: 'Erreur lors de la suppression de l\'utilisateur' });
   }
 });
@@ -184,61 +268,66 @@ router.get('/pending-managers', authMiddleware, adminMiddleware, async (req, res
 // Annuler une invitation
 router.delete('/pending-managers/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
+    console.log('Tentative d\'annulation de l\'invitation:', req.params.id);
+    
     const pendingManager = await PendingManager.findById(req.params.id);
     if (!pendingManager) {
+      console.log('Invitation non trouvée');
       return res.status(404).json({ message: 'Invitation non trouvée' });
     }
 
-    // Supprimer l'invitation en utilisant deleteOne pour plus de fiabilité
-    const result = await PendingManager.deleteOne({ _id: req.params.id });
-    console.log('Résultat de la suppression:', result);
+    console.log('Invitation trouvée:', pendingManager);
 
-    if (result.deletedCount === 0) {
-      console.error('Échec de la suppression de l\'invitation');
-      return res.status(500).json({ message: 'Échec de la suppression de l\'invitation' });
-    }
-
-    // Double vérification pour s'assurer que l'invitation est supprimée
-    const verifyDeletion = await PendingManager.findById(req.params.id);
-    if (verifyDeletion) {
-      // Si l'invitation existe encore, forcer la suppression
-      await PendingManager.deleteMany({ email: pendingManager.email });
-      console.log('Suppression forcée de toutes les invitations pour:', pendingManager.email);
-    }
-
-    // Envoyer un email d'annulation
+    // Envoyer l'email d'annulation
     try {
-      await transporter.sendMail({
-        from: {
-          name: 'CyberMathIA',
-          address: process.env.EMAIL_USER
-        },
+      await sendMailWithRetry({
         to: pendingManager.email,
-        subject: 'Invitation CyberMathIA annulée',
+        subject: 'Annulation de votre invitation CyberMathIA',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #4F46E5;">Information CyberMathIA</h1>
+            <h1 style="color: #4F46E5;">Information importante</h1>
             <p>Bonjour ${pendingManager.firstName},</p>
-            <p>Votre invitation à rejoindre CyberMathIA en tant que Manager a été annulée.</p>
-            <p>Si vous pensez qu'il s'agit d'une erreur, veuillez contacter l'administrateur.</p>
-            <p style="color: #666;">Le lien d'activation précédemment envoyé n'est plus valide.</p>
+            <p>Nous vous informons que votre invitation à rejoindre CyberMathIA en tant que Manager a été annulée.</p>
+            <p>Le lien d'activation qui vous a été envoyé n'est plus valide.</p>
+            <p>Si vous pensez qu'il s'agit d'une erreur, veuillez nous contacter à l'adresse suivante : support@cybermathia.fr</p>
+            <p style="color: #666;">Cordialement,<br>L'équipe CyberMathIA</p>
           </div>
         `
       });
+      console.log('Email d\'annulation envoyé avec succès');
     } catch (emailError) {
       console.error('Erreur lors de l\'envoi de l\'email d\'annulation:', emailError);
       // On continue même si l'email échoue
     }
 
+    // Supprimer l'invitation de la base de données
+    const deleteResult = await PendingManager.deleteOne({ _id: req.params.id });
+    console.log('Résultat de la suppression:', deleteResult);
+
+    if (deleteResult.deletedCount === 0) {
+      console.log('Échec de la suppression');
+      return res.status(500).json({ message: 'Échec de la suppression de l\'invitation' });
+    }
+
+    // Vérifier que l'invitation a bien été supprimée
+    const verifyDeletion = await PendingManager.findById(req.params.id);
+    if (verifyDeletion) {
+      console.log('L\'invitation existe encore après la suppression');
+      // Forcer la suppression avec deleteMany
+      await PendingManager.deleteMany({ email: pendingManager.email });
+    }
+
     // Rafraîchir la liste des invitations
     const remainingInvitations = await PendingManager.find().sort({ createdAt: -1 });
+    console.log('Invitations restantes:', remainingInvitations.length);
 
     res.json({ 
       message: 'Invitation annulée avec succès',
       remainingInvitations
     });
+
   } catch (error) {
-    console.error('Erreur lors de l\'annulation de l\'invitation:', error);
+    console.error('Erreur lors de l\'annulation:', error);
     res.status(500).json({ 
       message: 'Erreur lors de l\'annulation de l\'invitation',
       error: error.message 
@@ -258,11 +347,7 @@ router.post('/pending-managers/:id/resend', authMiddleware, adminMiddleware, asy
     const activationLink = `http://localhost:3000/complete-manager-registration?token=${pendingManager.token}`;
     
     // Renvoyer l'email avec le même token
-    await transporter.sendMail({
-      from: {
-        name: 'CyberMathIA',
-        address: process.env.EMAIL_USER
-      },
+    await sendMailWithRetry({
       to: pendingManager.email,
       subject: 'Invitation à rejoindre CyberMathIA en tant que Manager (renvoi)',
       html: `
