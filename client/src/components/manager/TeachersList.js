@@ -41,7 +41,10 @@ const TeachersList = ({ onTeacherClick }) => {
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [retryCount, setRetryCount] = useState(0);
+  const [lastUpdate, setLastUpdate] = useState(Date.now());
+
+  // Utiliser useRef pour stocker l'intervalle
+  const intervalRef = React.useRef(null);
 
   const fetchTeachers = async () => {
     try {
@@ -63,6 +66,7 @@ const TeachersList = ({ onTeacherClick }) => {
       setTeachers(response.data);
       setError(null);
       setLoading(false);
+      setLastUpdate(Date.now());
     } catch (error) {
       console.error('Erreur lors de la récupération des professeurs:', error);
       
@@ -72,37 +76,31 @@ const TeachersList = ({ onTeacherClick }) => {
         return;
       }
 
-      if (retryCount < 3) {
-        setRetryCount(prev => prev + 1);
-        setTimeout(fetchTeachers, 2000);
-      } else {
-        setError('Impossible de charger la liste des professeurs');
-        setLoading(false);
-      }
+      setError('Impossible de charger la liste des professeurs');
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchTeachers();
 
-    // Ajouter l'écouteur d'événement pour le rafraîchissement
-    const handleRefresh = () => {
-      setRetryCount(0);
+    // Mettre à jour toutes les 30 secondes au lieu de continuellement
+    intervalRef.current = setInterval(() => {
       fetchTeachers();
-    };
-
-    document.addEventListener('refresh-teachers', handleRefresh);
-
-    const interval = setInterval(() => {
-      setRetryCount(0);
-      fetchTeachers();
-    }, 5000);
+    }, 30000);
 
     return () => {
-      clearInterval(interval);
-      document.removeEventListener('refresh-teachers', handleRefresh);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     };
   }, []);
+
+  // Ajouter un gestionnaire d'événements pour le rafraîchissement manuel
+  const handleRefresh = () => {
+    setLoading(true);
+    fetchTeachers();
+  };
 
   const handleResendInvitation = async (teacherId) => {
     try {
@@ -214,7 +212,6 @@ const TeachersList = ({ onTeacherClick }) => {
   const handleRetry = () => {
     setLoading(true);
     setError(null);
-    setRetryCount(0);
     fetchTeachers();
   };
 

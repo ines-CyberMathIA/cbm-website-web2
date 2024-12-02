@@ -6,6 +6,7 @@ import nodemailer from 'nodemailer';
 import PendingTeacher from '../models/PendingTeacher.js';
 import TeacherAvailability from '../models/TeacherAvailability.js';
 import Message from '../models/Message.js';
+import managerController from '../controllers/managerController.js';
 
 const router = express.Router();
 
@@ -42,178 +43,55 @@ transporter.verify(function(error, success) {
   }
 });
 
-// Récupérer tous les professeurs créés par le manager
+// Route pour créer un professeur
+router.post('/create-teacher', authMiddleware, async (req, res) => {
+  try {
+    await managerController.createTeacher(req, res);
+  } catch (error) {
+    console.error('Erreur dans la route create-teacher:', error);
+    res.status(500).json({
+      message: 'Erreur lors de la création du professeur',
+      error: error.message
+    });
+  }
+});
+
+// Route pour récupérer les professeurs d'un manager
 router.get('/my-teachers', authMiddleware, async (req, res) => {
   try {
-    console.log('Recherche des professeurs pour le manager:', {
-      managerId: req.user.userId
-    });
+    console.log('Recherche des professeurs pour le manager:', { managerId: req.user.userId });
     
     // Récupérer les professeurs actifs
-    const activeTeachers = await User.find({ 
-      createdBy: req.user.userId,
-      role: 'teacher'
+    const activeTeachers = await User.find({
+      role: 'teacher',
+      createdBy: req.user.userId
     }).select('-password');
-
-    console.log('Professeurs actifs trouvés:', {
-      count: activeTeachers.length,
-      teachers: activeTeachers.map(t => ({
-        id: t._id,
-        email: t.email,
-        createdBy: t.createdBy
-      }))
-    });
+    
+    console.log('Professeurs actifs trouvés:', { count: activeTeachers.length, teachers: activeTeachers });
 
     // Récupérer les invitations en attente
     const pendingTeachers = await PendingTeacher.find({
       managerId: req.user.userId
     });
 
-    console.log('Invitations en attente trouvées:', {
-      count: pendingTeachers.length,
-      pending: pendingTeachers.map(t => ({
-        id: t._id,
-        email: t.email,
-        managerId: t.managerId
-      }))
-    });
+    console.log('Invitations en attente trouvées:', { count: pendingTeachers.length, pending: pendingTeachers });
 
     // Combiner les résultats
     const allTeachers = [
-      ...activeTeachers.map(t => ({
-        ...t.toObject(),
-        status: 'active'
-      })),
-      ...pendingTeachers.map(t => ({
-        _id: t._id,
-        firstName: t.firstName,
-        lastName: t.lastName,
-        email: t.email,
-        speciality: t.speciality,
-        level: t.level,
-        createdAt: t.createdAt,
-        status: 'pending',
-        expiresAt: new Date(t.createdAt.getTime() + 24*60*60*1000)
-      }))
+      ...activeTeachers.map(t => ({ ...t.toObject(), status: 'active' })),
+      ...pendingTeachers.map(t => ({ ...t.toObject(), status: 'pending' }))
     ];
 
     console.log('Liste finale des professeurs:', {
       total: allTeachers.length,
-      active: allTeachers.filter(t => t.status === 'active').length,
-      pending: allTeachers.filter(t => t.status === 'pending').length
+      active: activeTeachers.length,
+      pending: pendingTeachers.length
     });
 
     res.json(allTeachers);
   } catch (error) {
-    console.error('Erreur détaillée lors de la récupération des professeurs:', {
-      error: error.message,
-      stack: error.stack
-    });
-    res.status(500).json({ 
-      message: 'Erreur serveur',
-      details: error.message
-    });
-  }
-});
-
-// Créer un nouveau professeur
-router.post('/create-teacher', authMiddleware, async (req, res) => {
-  try {
-    const { firstName, lastName, email, speciality, level } = req.body;
-    
-    console.log('\n=== Début de création de professeur ===');
-    console.log('Données reçues:', {
-      firstName,
-      lastName,
-      email,
-      speciality,
-      level,
-      managerId: req.user.userId
-    });
-
-    // 1. Vérification de l'email dans la base des professeurs
-    const existingTeacherByEmail = await User.findOne({ 
-      email,
-      role: 'teacher'
-    });
-
-    if (existingTeacherByEmail) {
-      console.log('Email déjà utilisé par un professeur:', email);
-      return res.status(400).json({ 
-        message: 'Cette adresse email est déjà utilisée par un professeur' 
-      });
-    }
-
-    // 2. Vérification du couple (Nom, Prénom) dans la base des professeurs
-    const existingTeacherByName = await User.findOne({
-      firstName: { $regex: new RegExp(`^${firstName}$`, 'i') },
-      lastName: { $regex: new RegExp(`^${lastName}$`, 'i') },
-      role: 'teacher'
-    });
-
-    if (existingTeacherByName) {
-      console.log('Nom et prénom déjà utilisés:', { firstName, lastName });
-      return res.status(400).json({ 
-        message: 'Un professeur avec ce nom et ce prénom existe déjà' 
-      });
-    }
-
-    // 3. Vérification des invitations en attente par email
-    const pendingInvitationByEmail = await PendingTeacher.findOne({ email });
-    if (pendingInvitationByEmail) {
-      console.log('Invitation existante trouvée par email:', {
-        email,
-        invitingManagerId: pendingInvitationByEmail.managerId
-      });
-
-      const invitingManager = await User.findById(pendingInvitationByEmail.managerId);
-      return res.status(403).json({ 
-        message: `Ce professeur a déjà été invité par ${invitingManager.firstName} ${invitingManager.lastName}`,
-        alreadyInvited: true,
-        invitingManager: {
-          firstName: invitingManager.firstName,
-          lastName: invitingManager.lastName
-        }
-      });
-    }
-
-    // 4. Vérification des invitations en attente par nom/prénom
-    const pendingInvitationByName = await PendingTeacher.findOne({
-      firstName: { $regex: new RegExp(`^${firstName}$`, 'i') },
-      lastName: { $regex: new RegExp(`^${lastName}$`, 'i') }
-    });
-
-    if (pendingInvitationByName) {
-      console.log('Invitation existante trouvée par nom/prénom:', {
-        firstName,
-        lastName,
-        invitingManagerId: pendingInvitationByName.managerId
-      });
-
-      const invitingManager = await User.findById(pendingInvitationByName.managerId);
-      return res.status(403).json({ 
-        message: `Un professeur avec ce nom et ce prénom a déjà été invité par ${invitingManager.firstName} ${invitingManager.lastName}`,
-        alreadyInvited: true,
-        invitingManager: {
-          firstName: invitingManager.firstName,
-          lastName: invitingManager.lastName
-        }
-      });
-    }
-
-    // Si toutes les vérifications sont passées, on continue avec la création...
-    // ... reste du code inchangé ...
-
-  } catch (error) {
-    console.error('Erreur lors de la création du professeur:', {
-      error: error.message,
-      stack: error.stack
-    });
-
-    res.status(500).json({
-      message: 'Erreur lors de l\'envoi de l\'invitation',
-      details: error.message
-    });
+    console.error('Erreur lors de la récupération des professeurs:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 });
 
