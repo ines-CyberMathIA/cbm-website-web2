@@ -22,14 +22,17 @@ const TeacherModal = ({ onClose, setError }) => {
       transform transition-all duration-500 ease-out
       flex items-center space-x-2
       animate-slide-in-right
-      ${type === 'error' ? 'bg-red-500' : 'bg-yellow-500'} text-white
+      ${type === 'error' ? 'bg-red-500' : 
+        type === 'warning' ? 'bg-yellow-500' : 
+        'bg-green-500'} text-white
     `;
     
     notification.innerHTML = `
       <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
           d="${type === 'error' ? 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' : 
-          'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'}"/>
+             type === 'warning' ? 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' :
+             'M5 13l4 4L19 7'}"/>
       </svg>
       <span class="font-medium">${message}</span>
     `;
@@ -65,14 +68,26 @@ const TeacherModal = ({ onClose, setError }) => {
         }
       );
 
-      onClose(); // Fermer la modale dans tous les cas
+      onClose();
       showNotification('Invitation envoyée avec succès', 'success');
 
     } catch (error) {
       if (error.response?.data?.type === 'NAME_EXISTS') {
-        onClose(); // Fermer la modale
+        onClose();
         showNotification(
-          'Ce professeur est déjà enregistré par un autre manager',
+          `Le professeur ${formData.firstName} ${formData.lastName} est déjà enregistré par un autre manager`,
+          'warning'
+        );
+      } else if (error.response?.data?.type === 'EMAIL_EXISTS') {
+        onClose();
+        showNotification(
+          `L'adresse email ${formData.email} est déjà utilisée`,
+          'error'
+        );
+      } else if (error.response?.data?.type === 'PENDING_INVITATION') {
+        onClose();
+        showNotification(
+          `Une invitation est déjà en attente pour l'adresse ${formData.email}`,
           'warning'
         );
       } else {
