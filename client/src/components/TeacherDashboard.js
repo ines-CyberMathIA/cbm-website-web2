@@ -8,7 +8,7 @@ import Messages from './teacher/Messages';
 
 const TeacherDashboard = () => {
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem('user'));
+  const user = JSON.parse(sessionStorage.getItem('user'));
   const [activeSection, setActiveSection] = useState('calendar');
 
   // Vérification de l'authentification
@@ -53,7 +53,7 @@ const TeacherDashboard = () => {
               </span>
               <button
                 onClick={() => {
-                  localStorage.clear();
+                  sessionStorage.clear();
                   navigate('/login');
                 }}
                 className="text-gray-500 hover:text-gray-700"

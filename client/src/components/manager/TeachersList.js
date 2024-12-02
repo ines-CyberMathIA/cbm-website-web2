@@ -45,7 +45,7 @@ const TeachersList = ({ onTeacherClick }) => {
 
   const fetchTeachers = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       if (!token) {
         throw new Error('Token manquant');
       }
@@ -85,6 +85,14 @@ const TeachersList = ({ onTeacherClick }) => {
   useEffect(() => {
     fetchTeachers();
 
+    // Ajouter l'écouteur d'événement pour le rafraîchissement
+    const handleRefresh = () => {
+      setRetryCount(0);
+      fetchTeachers();
+    };
+
+    document.addEventListener('refresh-teachers', handleRefresh);
+
     const interval = setInterval(() => {
       setRetryCount(0);
       fetchTeachers();
@@ -92,12 +100,13 @@ const TeachersList = ({ onTeacherClick }) => {
 
     return () => {
       clearInterval(interval);
+      document.removeEventListener('refresh-teachers', handleRefresh);
     };
   }, []);
 
   const handleResendInvitation = async (teacherId) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       await axios.post(
         `http://localhost:5000/api/manager/resend-invitation/${teacherId}`,
         {},
@@ -117,16 +126,88 @@ const TeachersList = ({ onTeacherClick }) => {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(
+      setLoading(true);
+      const token = sessionStorage.getItem('token');
+      
+      console.log('Tentative d\'annulation pour:', {
+        teacherId,
+        token: token ? 'présent' : 'manquant'
+      });
+
+      const response = await axios.delete(
         `http://localhost:5000/api/manager/cancel-invitation/${teacherId}`,
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { 
+            Authorization: `Bearer ${token}`
+          }
         }
       );
-      fetchTeachers();
+
+      console.log('Réponse de l\'annulation:', response.data);
+
+      // Afficher une notification de succès
+      const notification = document.createElement('div');
+      notification.className = `
+        fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50
+        transform transition-all duration-500 ease-out
+        flex items-center space-x-2
+        animate-slide-in-right
+      `;
+      
+      notification.innerHTML = `
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        </svg>
+        <span class="font-medium">Invitation annulée avec succès</span>
+      `;
+      
+      document.body.appendChild(notification);
+
+      setTimeout(() => {
+        notification.classList.add('animate-slide-out-right');
+        setTimeout(() => {
+          notification.remove();
+        }, 500);
+      }, 3000);
+
+      // Rafraîchir la liste immédiatement
+      await fetchTeachers();
+
     } catch (error) {
-      setError('Erreur lors de l\'annulation de l\'invitation');
+      console.error('Erreur lors de l\'annulation:', error.response || error);
+      
+      const errorMessage = error.response?.data?.message || 
+        error.response?.data?.details ||
+        'Erreur lors de l\'annulation de l\'invitation';
+
+      setError(errorMessage);
+
+      // Afficher une notification d'erreur
+      const errorNotification = document.createElement('div');
+      errorNotification.className = `
+        fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50
+        transform transition-all duration-500 ease-out
+        flex items-center space-x-2
+        animate-slide-in-right
+      `;
+      
+      errorNotification.innerHTML = `
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+        <span class="font-medium">${errorMessage}</span>
+      `;
+      
+      document.body.appendChild(errorNotification);
+
+      setTimeout(() => {
+        errorNotification.classList.add('animate-slide-out-right');
+        setTimeout(() => {
+          errorNotification.remove();
+        }, 500);
+      }, 3000);
+    } finally {
+      setLoading(false);
     }
   };
 

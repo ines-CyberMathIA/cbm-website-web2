@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -14,7 +14,6 @@ const Login = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // Conserver la valeur exacte du mot de passe sans transformation
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -28,25 +27,28 @@ const Login = () => {
     setLoading(true);
 
     try {
+      sessionStorage.clear();
+
       const response = await axios.post('http://localhost:5000/api/users/login', {
         email: formData.email.toLowerCase(),
         password: formData.password,
         role: formData.role
       });
 
-      if (response.data.token) {
-        // Stocker le token et les infos utilisateur
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+      if (response.data.token && response.data.user) {
+        sessionStorage.setItem('token', response.data.token);
+        sessionStorage.setItem('user', JSON.stringify({
+          id: response.data.user.id,
+          role: response.data.user.role,
+          firstName: response.data.user.firstName,
+          lastName: response.data.user.lastName
+        }));
 
-        // Redirection selon le rôle
-        const role = response.data.user.role;
-        navigate(`/${role}/dashboard`);
-      } else {
-        setError('Erreur lors de la connexion : token manquant');
+        navigate(`/${response.data.user.role}/dashboard`);
       }
     } catch (error) {
       console.error('Erreur de connexion:', error);
+      
       if (error.response?.status === 401) {
         setError('Email ou mot de passe incorrect');
       } else {
@@ -56,6 +58,25 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  // Vérifier si l'utilisateur est déjà connecté
+  useEffect(() => {
+    const token = sessionStorage.getItem('token');
+    const user = sessionStorage.getItem('user');
+    
+    if (token && user) {
+      try {
+        const userData = JSON.parse(user);
+        if (userData.role) {
+          // Navigation sans replace
+          navigate(`/${userData.role}/dashboard`);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la vérification de la session:', error);
+        sessionStorage.clear();
+      }
+    }
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-gray-50 geometric-bg flex flex-col justify-center py-12 sm:px-6 lg:px-8">

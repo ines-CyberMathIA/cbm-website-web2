@@ -2,40 +2,31 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 
 const PrivateRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
-  const userStr = localStorage.getItem('user');
+  const token = sessionStorage.getItem('token');
+  const userStr = sessionStorage.getItem('user');
 
-  // Si pas de token ou pas d'utilisateur, rediriger vers la page de connexion
   if (!token || !userStr) {
-    console.log('Pas de token ou pas d\'utilisateur, redirection vers /login');
-    // Nettoyer le localStorage
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    return <Navigate to="/login" replace />;
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
+    return <Navigate to="/login" />;
   }
 
   try {
     const user = JSON.parse(userStr);
-    console.log('Utilisateur connecté:', user);
-
-    // Rediriger vers le bon dashboard selon le rôle
     const path = window.location.pathname;
     const correctPath = `/${user.role}/dashboard`;
 
     if (!path.includes(`/${user.role}/`)) {
-      console.log(`Redirection vers le dashboard ${user.role}`);
-      return <Navigate to={correctPath} replace />;
+      return <Navigate to={correctPath} />;
     }
 
-    // Si tout est OK, afficher le composant protégé
-    console.log('Accès autorisé au composant protégé');
     return children;
 
   } catch (error) {
     console.error('Erreur lors de la lecture des données utilisateur:', error);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    return <Navigate to="/login" replace />;
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
+    return <Navigate to="/login" />;
   }
 };
 

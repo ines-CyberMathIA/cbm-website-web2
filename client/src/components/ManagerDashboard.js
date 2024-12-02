@@ -17,24 +17,27 @@ const TeacherModal = ({ onClose, setError }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     setIsLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
+      if (!token) {
+        throw new Error('Token manquant - veuillez vous reconnecter');
+      }
+
       const response = await axios.post(
         'http://localhost:5000/api/manager/create-teacher',
         formData,
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         }
       );
 
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-      }
+      console.log('Réponse du serveur:', response.data);
 
-      onClose();
       // Afficher une notification de succès
       const notification = document.createElement('div');
       notification.className = `
@@ -48,7 +51,7 @@ const TeacherModal = ({ onClose, setError }) => {
         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
         </svg>
-        <span class="font-medium">Invitation envoyée avec succès</span>
+        <span class="font-medium">Invitation envoyée avec succès à ${formData.email}</span>
       `;
       
       document.body.appendChild(notification);
@@ -60,8 +63,49 @@ const TeacherModal = ({ onClose, setError }) => {
         }, 500);
       }, 3000);
 
+      // Fermer le modal
+      onClose();
+      
+      // Au lieu de recharger la page, rafraîchir uniquement la liste des professeurs
+      const teachersList = document.querySelector('#teachers-list');
+      if (teachersList) {
+        teachersList.dispatchEvent(new CustomEvent('refresh-teachers'));
+      }
+
     } catch (error) {
-      setError(error.response?.data?.message || 'Erreur lors de la création du professeur');
+      console.error('Erreur détaillée:', error.response || error);
+      
+      const errorMessage = error.response?.data?.message || 
+        error.response?.data?.details ||
+        error.message ||
+        'Erreur lors de l\'invitation';
+
+      setError(errorMessage);
+      
+      // Afficher une notification d'erreur
+      const errorNotification = document.createElement('div');
+      errorNotification.className = `
+        fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50
+        transform transition-all duration-500 ease-out
+        flex items-center space-x-2
+        animate-slide-in-right
+      `;
+      
+      errorNotification.innerHTML = `
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+        <span class="font-medium">${errorMessage}</span>
+      `;
+      
+      document.body.appendChild(errorNotification);
+
+      setTimeout(() => {
+        errorNotification.classList.add('animate-slide-out-right');
+        setTimeout(() => {
+          errorNotification.remove();
+        }, 500);
+      }, 3000);
     } finally {
       setIsLoading(false);
     }
@@ -69,56 +113,62 @@ const TeacherModal = ({ onClose, setError }) => {
 
   return (
     <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">Inviter un professeur</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+      <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">Inviter un professeur</h2>
+          <button 
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-500 transition-colors"
+          >
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Prénom</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
             <input
               type="text"
               value={formData.firstName}
               onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
               required
+              placeholder="Jean"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">Nom</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
             <input
               type="text"
               value={formData.lastName}
               onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
               required
+              placeholder="Dupont"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">Email</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
               required
+              placeholder="jean.dupont@example.com"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">Spécialité</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Spécialité</label>
             <select
               value={formData.speciality}
               onChange={(e) => setFormData({ ...formData, speciality: e.target.value })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
             >
               <option value="mathematics">Mathématiques</option>
               <option value="physics">Physique</option>
@@ -129,45 +179,58 @@ const TeacherModal = ({ onClose, setError }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">Niveaux</label>
-            <div className="mt-2 space-y-2">
-              {['college', 'lycee', 'superieur', 'adulte'].map((level) => (
-                <label key={level} className="inline-flex items-center mr-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Niveaux d'enseignement</label>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { id: 'college', label: 'Collège' },
+                { id: 'lycee', label: 'Lycée' },
+                { id: 'superieur', label: 'Supérieur' },
+                { id: 'adulte', label: 'Adulte' }
+              ].map(({ id, label }) => (
+                <label key={id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
                   <input
                     type="checkbox"
-                    checked={formData.level.includes(level)}
+                    checked={formData.level.includes(id)}
                     onChange={(e) => {
                       const newLevels = e.target.checked
-                        ? [...formData.level, level]
-                        : formData.level.filter(l => l !== level);
+                        ? [...formData.level, id]
+                        : formData.level.filter(l => l !== id);
                       setFormData({ ...formData, level: newLevels });
                     }}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded transition-colors"
                   />
-                  <span className="ml-2 text-sm text-gray-700">
-                    {level === 'college' ? 'Collège' :
-                     level === 'lycee' ? 'Lycée' :
-                     level === 'superieur' ? 'Supérieur' : 'Adulte'}
-                  </span>
+                  <span className="text-sm text-gray-700">{label}</span>
                 </label>
               ))}
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3 mt-6">
+          <div className="flex justify-end space-x-3 mt-8">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+              className={`
+                px-4 py-2 bg-indigo-600 text-white rounded-lg
+                hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500
+                transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+              `}
             >
-              {isLoading ? 'Envoi...' : 'Inviter'}
+              {isLoading ? (
+                <div className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Envoi en cours...
+                </div>
+              ) : 'Inviter'}
             </button>
           </div>
         </form>
@@ -178,11 +241,34 @@ const TeacherModal = ({ onClose, setError }) => {
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem('user'));
+  const user = JSON.parse(sessionStorage.getItem('user'));
   const [activeSection, setActiveSection] = useState('teachers');
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [error, setError] = useState('');
+
+  // Vérification de l'authentification
+  React.useEffect(() => {
+    if (!user || user.role !== 'manager') {
+      navigate('/login');
+    }
+  }, [navigate, user]);
+
+  // Fonction de déconnexion sécurisée
+  const handleLogout = (e) => {
+    e.preventDefault();
+    try {
+      // Nettoyer la session
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+      sessionStorage.clear();
+      
+      // Rediriger vers la page de connexion
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+    }
+  };
 
   // Gestion de la sélection d'un professeur
   const handleTeacherClick = (teacher) => {
@@ -199,7 +285,11 @@ const ManagerDashboard = () => {
         if (!selectedTeacher) return;
         
         try {
-          const token = localStorage.getItem('token');
+          const token = sessionStorage.getItem('token');
+          if (!token) {
+            throw new Error('Token manquant - veuillez vous reconnecter');
+          }
+
           const response = await axios.get(
             `http://localhost:5000/api/manager/teacher/${selectedTeacher._id}/availabilities`,
             {
@@ -209,11 +299,14 @@ const ManagerDashboard = () => {
           setAvailabilities(response.data);
         } catch (error) {
           console.error('Erreur lors du chargement des disponibilités:', error);
+          if (error.message.includes('Token manquant')) {
+            window.location.href = '/login';
+          }
         }
       };
 
       fetchAvailabilities();
-    }, []); // Supprimé selectedTeacher des dépendances
+    }, [selectedTeacher]);
 
     if (!selectedTeacher) return null;
 
@@ -236,10 +329,7 @@ const ManagerDashboard = () => {
                 {user?.firstName} {user?.lastName}
               </span>
               <button
-                onClick={() => {
-                  localStorage.clear();
-                  navigate('/login');
-                }}
+                onClick={handleLogout}
                 className="text-gray-500 hover:text-gray-700"
               >
                 Déconnexion

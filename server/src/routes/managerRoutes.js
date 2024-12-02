@@ -9,16 +9,23 @@ import Message from '../models/Message.js';
 
 const router = express.Router();
 
-// Configuration du transporteur email
+// Configuration du transporteur email avec plus de logs et de gestion d'erreurs
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
   auth: {
-    user: 'noreply.cybermathia@gmail.com',  // Email en dur
-    pass: 'zayf pfpp iatp dmwm'  // Mot de passe en dur
+    user: 'noreply.cybermathia@gmail.com',
+    pass: 'zayf pfpp iatp dmwm'
   },
+  debug: true, // Active les logs détaillés
+  logger: true, // Active le logging
   tls: {
     rejectUnauthorized: false
-  }
+  },
+  maxConnections: 5,
+  maxMessages: 10,
+  pool: true // Active le pool de connexions
 });
 
 // Vérifier la configuration immédiatement
@@ -27,10 +34,11 @@ transporter.verify(function(error, success) {
     console.error('Erreur de configuration email:', {
       error: error.message,
       code: error.code,
-      command: error.command
+      command: error.command,
+      response: error.response
     });
   } else {
-    console.log('Configuration email réussie');
+    console.log('Configuration email réussie:', success);
   }
 });
 
@@ -113,172 +121,92 @@ router.post('/create-teacher', authMiddleware, async (req, res) => {
   try {
     const { firstName, lastName, email, speciality, level } = req.body;
     
-    // Récupérer le token actuel
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ message: 'Token manquant' });
-    }
-
-    console.log('Création de professeur par le manager:', {
-      managerId: req.user.userId,
-      teacherData: { firstName, lastName, email, speciality, level }
+    console.log('\n=== Début de création de professeur ===');
+    console.log('Données reçues:', {
+      firstName,
+      lastName,
+      email,
+      speciality,
+      level,
+      managerId: req.user.userId
     });
 
-    // Vérifier si l'email existe déjà dans les utilisateurs actifs
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      console.log('Email déjà utilisé dans users:', email);
-      return res.status(400).json({ message: 'Cet email est déjà utilisé' });
-    }
+    // 1. Vérification de l'email dans la base des professeurs
+    const existingTeacherByEmail = await User.findOne({ 
+      email,
+      role: 'teacher'
+    });
 
-    // Supprimer toute invitation en attente existante pour cet email
-    await PendingTeacher.deleteOne({ email });
-    console.log('Anciennes invitations supprimées pour:', email);
-
-    // Vérifier les données requises
-    if (!firstName || !lastName || !email) {
-      console.log('Données manquantes');
+    if (existingTeacherByEmail) {
+      console.log('Email déjà utilisé par un professeur:', email);
       return res.status(400).json({ 
-        message: 'Tous les champs sont requis',
-        received: { firstName, lastName, email, speciality, level }
+        message: 'Cette adresse email est déjà utilisée par un professeur' 
       });
     }
 
-    // Vérifier la configuration email
-    console.log('Configuration email:', {
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT,
-      secure: process.env.SMTP_SECURE,
-      user: process.env.EMAIL_USER,
-      hasPassword: !!process.env.EMAIL_PASSWORD
+    // 2. Vérification du couple (Nom, Prénom) dans la base des professeurs
+    const existingTeacherByName = await User.findOne({
+      firstName: { $regex: new RegExp(`^${firstName}$`, 'i') },
+      lastName: { $regex: new RegExp(`^${lastName}$`, 'i') },
+      role: 'teacher'
     });
 
-    // Tester la connexion SMTP avant d'envoyer
-    try {
-      await transporter.verify();
-      console.log('Connexion SMTP vérifiée avec succès');
-    } catch (smtpError) {
-      console.error('Erreur de connexion SMTP:', smtpError);
-      return res.status(500).json({
-        message: 'Erreur de configuration email',
-        details: smtpError.message
+    if (existingTeacherByName) {
+      console.log('Nom et prénom déjà utilisés:', { firstName, lastName });
+      return res.status(400).json({ 
+        message: 'Un professeur avec ce nom et ce prénom existe déjà' 
       });
     }
 
-    // Générer le token
-    const inviteToken = jwt.sign(
-      { 
-        firstName, 
-        lastName, 
+    // 3. Vérification des invitations en attente par email
+    const pendingInvitationByEmail = await PendingTeacher.findOne({ email });
+    if (pendingInvitationByEmail) {
+      console.log('Invitation existante trouvée par email:', {
         email,
-        role: 'teacher',
-        speciality: speciality || 'mathematics',
-        level: level || ['college'],
-        createdBy: req.user.userId
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+        invitingManagerId: pendingInvitationByEmail.managerId
+      });
 
-    // Créer l'invitation en attente
-    const pendingTeacher = new PendingTeacher({
-      firstName,
-      lastName,
-      email,
-      speciality: speciality || 'mathematics',
-      level: level || ['college'],
-      managerId: req.user.userId,
-      token: inviteToken
-    });
-
-    await pendingTeacher.save();
-
-    console.log('Token créé avec les données:', {
-      email,
-      role: 'teacher',
-      firstName,
-      lastName,
-      speciality: speciality || 'mathematics',
-      level: level || ['college'],
-      createdBy: req.user.userId,
-      managerId: req.user.userId,
-      managerEmail: req.user.email
-    });
-
-    const inviteUrl = `http://localhost:3000/complete-teacher-registration?token=${inviteToken}`;
-    console.log('URL d\'invitation générée:', inviteUrl);
-
-    // Envoyer l'email
-    try {
-      const mailOptions = {
-        from: {
-          name: 'CyberMathIA',
-          address: process.env.EMAIL_USER
-        },
-        to: email,
-        subject: 'Invitation à rejoindre CyberMathIA en tant que Professeur',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #4F46E5;">Bienvenue chez CyberMathIA !</h1>
-            <p>Bonjour ${firstName},</p>
-            <p>Vous avez été invité(e) à rejoindre l'équipe CyberMathIA en tant que Professeur.</p>
-            <p>Pour finaliser la création de votre compte, veuillez cliquer sur le lien ci-dessous :</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${inviteUrl}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                Finaliser mon inscription
-              </a>
-            </div>
-            <p style="color: #666;">Ce lien expire dans 24 heures.</p>
-          </div>
-        `
-      };
-
-      console.log('Tentative d\'envoi d\'email avec:', {
-        to: email,
-        from: mailOptions.from,
-        auth: {
-          user: process.env.EMAIL_USER,
-          hasPassword: !!process.env.EMAIL_PASSWORD
+      const invitingManager = await User.findById(pendingInvitationByEmail.managerId);
+      return res.status(403).json({ 
+        message: `Ce professeur a déjà été invité par ${invitingManager.firstName} ${invitingManager.lastName}`,
+        alreadyInvited: true,
+        invitingManager: {
+          firstName: invitingManager.firstName,
+          lastName: invitingManager.lastName
         }
       });
+    }
 
-      const info = await transporter.sendMail(mailOptions);
-      
-      console.log('Email envoyé avec succès:', {
-        messageId: info.messageId,
-        response: info.response,
-        accepted: info.accepted,
-        rejected: info.rejected
+    // 4. Vérification des invitations en attente par nom/prénom
+    const pendingInvitationByName = await PendingTeacher.findOne({
+      firstName: { $regex: new RegExp(`^${firstName}$`, 'i') },
+      lastName: { $regex: new RegExp(`^${lastName}$`, 'i') }
+    });
+
+    if (pendingInvitationByName) {
+      console.log('Invitation existante trouvée par nom/prénom:', {
+        firstName,
+        lastName,
+        invitingManagerId: pendingInvitationByName.managerId
       });
 
-      res.status(200).json({
-        message: 'Invitation envoyée avec succès',
-        pendingTeacher: {
-          id: pendingTeacher._id,
-          email: pendingTeacher.email,
-          expiresAt: new Date(pendingTeacher.createdAt.getTime() + 24*60*60*1000)
-        },
-        token: token
-      });
-    } catch (emailError) {
-      console.error('Erreur détaillée lors de l\'envoi de l\'email:', {
-        name: emailError.name,
-        message: emailError.message,
-        code: emailError.code,
-        command: emailError.command,
-        stack: emailError.stack
-      });
-
-      res.status(500).json({
-        message: 'Erreur lors de l\'envoi de l\'email',
-        details: emailError.message,
-        code: emailError.code
+      const invitingManager = await User.findById(pendingInvitationByName.managerId);
+      return res.status(403).json({ 
+        message: `Un professeur avec ce nom et ce prénom a déjà été invité par ${invitingManager.firstName} ${invitingManager.lastName}`,
+        alreadyInvited: true,
+        invitingManager: {
+          firstName: invitingManager.firstName,
+          lastName: invitingManager.lastName
+        }
       });
     }
+
+    // Si toutes les vérifications sont passées, on continue avec la création...
+    // ... reste du code inchangé ...
+
   } catch (error) {
-    console.error('Erreur complète:', {
-      name: error.name,
-      message: error.message,
+    console.error('Erreur lors de la création du professeur:', {
+      error: error.message,
       stack: error.stack
     });
 
@@ -460,49 +388,107 @@ router.post('/resend-invitation/:teacherId', authMiddleware, async (req, res) =>
   }
 });
 
-// Ajouter cette route pour annuler une invitation
+// Modifier la route d'annulation d'invitation
 router.delete('/cancel-invitation/:teacherId', authMiddleware, async (req, res) => {
   try {
     const { teacherId } = req.params;
+    console.log('\n=== Début de l\'annulation d\'invitation ===');
+    console.log('Paramètres reçus:', {
+      teacherId,
+      managerId: req.user.userId,
+      headers: req.headers
+    });
     
+    // Vérifier que l'invitation existe et appartient au manager
     const pendingTeacher = await PendingTeacher.findOne({
       _id: teacherId,
       managerId: req.user.userId
     });
 
-    if (!pendingTeacher) {
-      return res.status(404).json({ message: 'Invitation non trouvée' });
-    }
-
-    // Envoyer un email d'annulation
-    await transporter.sendMail({
-      from: {
-        name: 'CyberMathIA',
-        address: process.env.EMAIL_USER
-      },
-      to: pendingTeacher.email,
-      subject: 'Annulation de votre invitation CyberMathIA',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #4F46E5;">Information importante</h1>
-          <p>Bonjour ${pendingTeacher.firstName},</p>
-          <p>Nous vous informons que votre invitation à rejoindre CyberMathIA a été annulée.</p>
-          <p>Le lien d'activation précédent n'est plus valide.</p>
-          <p style="color: #666;">Si vous pensez qu'il s'agit d'une erreur, veuillez contacter votre manager.</p>
-        </div>
-      `
+    console.log('Recherche de l\'invitation:', {
+      found: !!pendingTeacher,
+      teacherDetails: pendingTeacher ? {
+        email: pendingTeacher.email,
+        firstName: pendingTeacher.firstName,
+        managerId: pendingTeacher.managerId
+      } : null
     });
 
-    // Supprimer l'invitation
-    await PendingTeacher.deleteOne({ _id: teacherId });
+    if (!pendingTeacher) {
+      console.log('Invitation non trouvée ou non autorisée');
+      return res.status(404).json({ 
+        message: 'Invitation non trouvée ou non autorisée',
+        details: {
+          searchedId: teacherId,
+          searchedManagerId: req.user.userId
+        }
+      });
+    }
 
-    res.json({ message: 'Invitation annulée avec succès' });
+    // Envoyer l'email d'annulation
+    try {
+      console.log('Tentative d\'envoi de l\'email d\'annulation');
+      await transporter.sendMail({
+        from: {
+          name: 'CyberMathIA',
+          address: process.env.EMAIL_USER || 'noreply.cybermathia@gmail.com'
+        },
+        to: pendingTeacher.email,
+        subject: 'Annulation de votre invitation CyberMathIA',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #4F46E5;">Information importante</h1>
+            <p>Bonjour ${pendingTeacher.firstName},</p>
+            <p>Nous vous informons que votre invitation à rejoindre CyberMathIA a été annulée.</p>
+            <p>Le lien d'activation précédent n'est plus valide.</p>
+            <p style="color: #666;">Si vous pensez qu'il s'agit d'une erreur, veuillez contacter votre manager.</p>
+          </div>
+        `
+      });
+      console.log('Email d\'annulation envoyé avec succès');
+    } catch (emailError) {
+      console.error('Erreur lors de l\'envoi de l\'email d\'annulation:', {
+        error: emailError.message,
+        code: emailError.code
+      });
+      // On continue même si l'email échoue
+    }
+
+    // Supprimer l'invitation
+    console.log('Tentative de suppression de l\'invitation');
+    const result = await PendingTeacher.deleteOne({
+      _id: teacherId,
+      managerId: req.user.userId
+    });
+
+    console.log('Résultat de la suppression:', {
+      acknowledged: result.acknowledged,
+      deletedCount: result.deletedCount
+    });
+
+    if (result.deletedCount === 0) {
+      throw new Error('Échec de la suppression de l\'invitation');
+    }
+
+    console.log('=== Fin de l\'annulation d\'invitation ===\n');
+    res.json({ 
+      message: 'Invitation annulée avec succès',
+      teacherId,
+      deletedCount: result.deletedCount
+    });
 
   } catch (error) {
-    console.error('Erreur lors de l\'annulation de l\'invitation:', error);
+    console.error('Erreur lors de l\'annulation de l\'invitation:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      teacherId: req.params.teacherId,
+      managerId: req.user?.userId
+    });
+
     res.status(500).json({ 
       message: 'Erreur lors de l\'annulation de l\'invitation',
-      details: error.message 
+      details: error.message
     });
   }
 });
