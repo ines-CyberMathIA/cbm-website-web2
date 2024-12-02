@@ -40,8 +40,8 @@ const userSchema = new mongoose.Schema({
   },
   level: [{
     type: String,
-    enum: ['6eme', '5eme', '4eme', '3eme', '2nde', '1ere', 'terminale'],
-    required: function() { return this.role === 'student'; }
+    enum: ['college', 'lycee', 'superieur', 'adulte'],
+    required: function() { return this.role === 'teacher'; }
   }],
   parentId: {
     type: mongoose.Schema.Types.ObjectId,

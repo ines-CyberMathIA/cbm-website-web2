@@ -259,10 +259,16 @@ router.post('/complete-teacher-registration', async (req, res) => {
       createdBy: pendingTeacher.managerId
     });
 
-    const savedTeacher = await teacher.save();
-
-    // Supprimer l'invitation en attente
+    // Important: Supprimer d'abord l'invitation en attente
     await PendingTeacher.deleteOne({ _id: pendingTeacher._id });
+
+    // Sauvegarder le nouveau professeur
+    const savedTeacher = await teacher.save();
+    console.log('Professeur créé avec succès:', {
+      id: savedTeacher._id,
+      email: savedTeacher.email,
+      level: savedTeacher.level
+    });
 
     // Générer le token de connexion
     const authToken = jwt.sign(
@@ -284,7 +290,13 @@ router.post('/complete-teacher-registration', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Erreur lors de la création du compte:', error);
+    console.error('Erreur détaillée lors de la création du compte:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      errors: error.errors
+    });
+    
     res.status(400).json({ 
       message: 'Erreur lors de la création du compte',
       details: error.message
