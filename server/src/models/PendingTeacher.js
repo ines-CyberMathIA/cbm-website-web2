@@ -40,6 +40,9 @@ const pendingTeacherSchema = new mongoose.Schema({
   }
 });
 
+// Ajouter un index composé sur firstName et lastName
+pendingTeacherSchema.index({ firstName: 1, lastName: 1 }, { unique: true });
+
 // Méthode statique pour vérifier un token
 pendingTeacherSchema.statics.findByToken = async function(token) {
   try {
@@ -59,6 +62,40 @@ pendingTeacherSchema.statics.findByToken = async function(token) {
     console.error('Erreur lors de la vérification du token:', error);
     return null;
   }
+};
+
+// Ajouter une méthode statique pour vérifier l'existence
+pendingTeacherSchema.statics.checkExistingTeacher = async function(firstName, lastName) {
+  // Vérifier dans PendingTeacher
+  const pendingTeacher = await this.findOne({ 
+    firstName: new RegExp(`^${firstName}$`, 'i'),
+    lastName: new RegExp(`^${lastName}$`, 'i')
+  });
+
+  if (pendingTeacher) {
+    return {
+      exists: true,
+      type: 'pending',
+      data: pendingTeacher
+    };
+  }
+
+  // Vérifier dans User (professeurs actifs)
+  const existingTeacher = await mongoose.model('User').findOne({
+    firstName: new RegExp(`^${firstName}$`, 'i'),
+    lastName: new RegExp(`^${lastName}$`, 'i'),
+    role: 'teacher'
+  });
+
+  if (existingTeacher) {
+    return {
+      exists: true,
+      type: 'active',
+      data: existingTeacher
+    };
+  }
+
+  return { exists: false };
 };
 
 export default mongoose.model('PendingTeacher', pendingTeacherSchema); 

@@ -73,6 +73,20 @@ const managerController = {
         });
       }
 
+      // Nouvelle vérification sur le couple (nom, prénom)
+      const existingTeacher = await PendingTeacher.checkExistingTeacher(firstName, lastName);
+      if (existingTeacher.exists) {
+        const message = existingTeacher.type === 'pending' 
+          ? 'Un professeur avec ce nom et prénom est déjà invité'
+          : 'Un professeur avec ce nom et prénom existe déjà';
+        
+        return res.status(400).json({
+          message,
+          type: 'NAME_EXISTS',
+          teacherType: existingTeacher.type
+        });
+      }
+
       // Créer un token pour l'invitation
       const token = jwt.sign(
         { email, role: 'teacher', firstName, lastName, speciality, level },
