@@ -3,14 +3,17 @@ import axios from 'axios';
 
 // Fonction pour formater le temps restant
 const formatTimeLeft = (expiresAt) => {
+  if (!expiresAt) return 'Expiré';
+  
   const now = new Date();
   const expiry = new Date(expiresAt);
   const diff = expiry - now;
   
+  if (diff <= 0) return 'Expiré';
+  
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   
-  if (hours < 0 || minutes < 0) return 'Expiré';
   return `${hours}h ${minutes}m`;
 };
 
@@ -215,6 +218,12 @@ const TeachersList = ({ onTeacherClick }) => {
     fetchTeachers();
   };
 
+  const calculateExpiryTime = (createdAt) => {
+    if (!createdAt) return null;
+    const creationDate = new Date(createdAt);
+    return new Date(creationDate.getTime() + 24 * 60 * 60 * 1000); // +24 heures
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -288,7 +297,7 @@ const TeachersList = ({ onTeacherClick }) => {
                         </h5>
                         <p className="text-sm text-gray-500">{teacher.email}</p>
                         <p className="text-xs text-gray-400 mt-1">
-                          Expire dans: {formatTimeLeft(teacher.expiresAt)}
+                          Expire dans: {formatTimeLeft(calculateExpiryTime(teacher.createdAt))}
                         </p>
                       </div>
                       <div className="flex space-x-3">
