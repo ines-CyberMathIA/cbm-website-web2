@@ -15,19 +15,21 @@ const TeacherModal = ({ onClose, setError }) => {
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fonction pour afficher une notification de succès
-  const showSuccessNotification = (message) => {
+  const showNotification = (message, type = 'error') => {
     const notification = document.createElement('div');
     notification.className = `
-      fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50
+      fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50
       transform transition-all duration-500 ease-out
       flex items-center space-x-2
       animate-slide-in-right
+      ${type === 'error' ? 'bg-red-500' : 'bg-yellow-500'} text-white
     `;
     
     notification.innerHTML = `
       <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+          d="${type === 'error' ? 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' : 
+          'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'}"/>
       </svg>
       <span class="font-medium">${message}</span>
     `;
@@ -39,7 +41,7 @@ const TeacherModal = ({ onClose, setError }) => {
       setTimeout(() => {
         notification.remove();
       }, 500);
-    }, 3000);
+    }, 5000);
   };
 
   const handleSubmit = async (e) => {
@@ -63,17 +65,19 @@ const TeacherModal = ({ onClose, setError }) => {
         }
       );
 
-      showSuccessNotification(`Invitation envoyée avec succès à ${formData.email}`);
-      onClose();
+      onClose(); // Fermer la modale dans tous les cas
+      showNotification('Invitation envoyée avec succès', 'success');
 
     } catch (error) {
-      const errorMessage = error.response?.data?.type === 'NAME_EXISTS'
-        ? error.response.data.teacherType === 'pending'
-          ? 'Un professeur avec ce nom et prénom est déjà invité'
-          : 'Un professeur avec ce nom et prénom existe déjà'
-        : error.response?.data?.message || 'Erreur lors de l\'envoi de l\'invitation';
-
-      setError(errorMessage);
+      if (error.response?.data?.type === 'NAME_EXISTS') {
+        onClose(); // Fermer la modale
+        showNotification(
+          'Ce professeur est déjà enregistré par un autre manager',
+          'warning'
+        );
+      } else {
+        setError(error.response?.data?.message || 'Erreur lors de l\'envoi de l\'invitation');
+      }
     } finally {
       setIsLoading(false);
     }
