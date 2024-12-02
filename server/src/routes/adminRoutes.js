@@ -101,13 +101,78 @@ router.post('/verify-2fa', adminController.verifyTwoFactor);
 router.get('/stats', authMiddleware, adminMiddleware, adminController.getStats);
 router.get('/connections', authMiddleware, adminMiddleware, adminController.getConnections);
 
-// Autres routes protégées
-router.get('/users/:role', authMiddleware, adminMiddleware, async (req, res) => {
+// Route pour récupérer tous les utilisateurs
+router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const users = await adminController.getUsersByRole(req.params.role);
+    console.log('Récupération de tous les utilisateurs');
+    const users = await User.find({})
+      .select('-password -twoFactorCode')
+      .sort({ createdAt: -1 });
+    
+    console.log(`${users.length} utilisateurs trouvés`);
     res.json(users);
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la récupération des utilisateurs' });
+    console.error('Erreur lors de la récupération des utilisateurs:', error);
+    res.status(500).json({ 
+      message: 'Erreur lors de la récupération des utilisateurs',
+      error: error.message 
+    });
+  }
+});
+
+// Route pour récupérer les utilisateurs par rôle
+router.get('/users/:role', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { role } = req.params;
+    console.log('Récupération des utilisateurs par rôle:', role);
+
+    // Vérifier que le rôle est valide
+    const validRoles = ['manager', 'teacher', 'parent', 'student'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ message: 'Rôle invalide' });
+    }
+
+    const users = await User.find({ role })
+      .select('-password -twoFactorCode')
+      .sort({ createdAt: -1 });
+    
+    console.log(`${users.length} utilisateurs trouvés pour le rôle ${role}`);
+    res.json(users);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des utilisateurs:', error);
+    res.status(500).json({ 
+      message: 'Erreur lors de la récupération des utilisateurs',
+      error: error.message 
+    });
+  }
+});
+
+// Route pour supprimer un utilisateur
+router.delete('/users/:userId', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    console.log('Suppression de l\'utilisateur:', userId);
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    // Empêcher la suppression d'un admin
+    if (user.role === 'admin') {
+      return res.status(403).json({ message: 'Impossible de supprimer un administrateur' });
+    }
+
+    await User.deleteOne({ _id: userId });
+    console.log('Utilisateur supprimé avec succès');
+    
+    res.json({ message: 'Utilisateur supprimé avec succès' });
+  } catch (error) {
+    console.error('Erreur lors de la suppression de l\'utilisateur:', error);
+    res.status(500).json({ 
+      message: 'Erreur lors de la suppression de l\'utilisateur',
+      error: error.message 
+    });
   }
 });
 
@@ -215,41 +280,6 @@ router.post('/create-manager', authMiddleware, adminMiddleware, async (req, res)
       message: 'Erreur lors de la création du manager',
       error: error.message 
     });
-  }
-});
-
-router.delete('/users/:userId', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId);
-    if (!user) {
-      return res.status(404).json({ message: 'Utilisateur non trouvé' });
-    }
-
-    // Envoyer un email de notification
-    try {
-      await sendMailWithRetry({
-        to: user.email,
-        subject: 'Suppression de votre compte CyberMathIA',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #4F46E5;">Information importante</h1>
-            <p>Bonjour ${user.firstName},</p>
-            <p>Nous vous informons que votre compte CyberMathIA a été supprimé par l'administration.</p>
-            <p>Si vous pensez qu'il s'agit d'une erreur, veuillez nous contacter à l'adresse suivante : support@cybermathia.fr</p>
-            <p style="color: #666;">Cordialement,<br>L'équipe CyberMathIA</p>
-          </div>
-        `
-      });
-    } catch (emailError) {
-      console.error('Erreur lors de l\'envoi de l\'email de suppression:', emailError);
-      // On continue même si l'email échoue
-    }
-
-    await User.findByIdAndDelete(req.params.userId);
-    res.json({ message: 'Utilisateur supprimé avec succès' });
-  } catch (error) {
-    console.error('Erreur lors de la suppression:', error);
-    res.status(500).json({ message: 'Erreur lors de la suppression de l\'utilisateur' });
   }
 });
 

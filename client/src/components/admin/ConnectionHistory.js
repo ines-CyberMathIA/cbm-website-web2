@@ -8,23 +8,23 @@ const ConnectionHistory = () => {
   const [filter, setFilter] = useState('all'); // 'all', 'today', 'week', 'month'
 
   useEffect(() => {
+    const fetchConnections = async () => {
+      try {
+        const token = sessionStorage.getItem('token');
+        const response = await axios.get(
+          'http://localhost:5000/api/admin/connections',
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setConnections(response.data);
+        setLoading(false);
+      } catch (error) {
+        setError('Erreur lors du chargement de l\'historique des connexions');
+        setLoading(false);
+      }
+    };
+
     fetchConnections();
   }, []);
-
-  const fetchConnections = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(
-        'http://localhost:5000/api/admin/connections',
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setConnections(response.data);
-      setLoading(false);
-    } catch (err) {
-      setError('Erreur lors du chargement de l\'historique des connexions');
-      setLoading(false);
-    }
-  };
 
   const filterConnections = () => {
     const now = new Date();

@@ -13,7 +13,7 @@ const UserRelations = () => {
 
   const fetchManagers = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await axios.get(
         'http://localhost:5000/api/admin/users/manager',
         { headers: { Authorization: `Bearer ${token}` } }

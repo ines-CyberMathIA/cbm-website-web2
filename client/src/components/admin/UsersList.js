@@ -13,7 +13,7 @@ const UsersList = () => {
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       let url = 'http://localhost:5000/api/admin/users';
       if (selectedRole !== 'all') {
         url += `/${selectedRole}`;
@@ -33,7 +33,7 @@ const UsersList = () => {
     if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) return;
     
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       await axios.delete(
         `http://localhost:5000/api/admin/users/${userId}`,
         { headers: { Authorization: `Bearer ${token}` } }

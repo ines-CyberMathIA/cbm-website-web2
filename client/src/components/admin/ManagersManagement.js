@@ -24,7 +24,7 @@ const ManagersManagement = () => {
 
   const fetchManagers = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await axios.get(
         'http://localhost:5000/api/admin/users/manager',
         { headers: { Authorization: `Bearer ${token}` } }
@@ -39,7 +39,7 @@ const ManagersManagement = () => {
 
   const fetchPendingManagers = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await axios.get(
         'http://localhost:5000/api/admin/pending-managers',
         { headers: { Authorization: `Bearer ${token}` } }
@@ -97,7 +97,7 @@ const ManagersManagement = () => {
     setFormData({ firstName: '', lastName: '', email: '' });
 
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       await axios.post(
         'http://localhost:5000/api/admin/create-manager',
         submittedData,  // Utiliser les données sauvegardées
@@ -136,7 +136,7 @@ const ManagersManagement = () => {
 
   const handleResendInvitation = async (invitationId) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       await axios.post(
         `http://localhost:5000/api/admin/pending-managers/${invitationId}/resend`,
         {},
@@ -160,7 +160,7 @@ const ManagersManagement = () => {
 
   const handleConfirmAction = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       if (!token) {
         showTemporaryError('Session expirée, veuillez vous reconnecter');
         return;
@@ -240,7 +240,7 @@ const ManagersManagement = () => {
   const refreshData = async () => {
     setIsRefreshing(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       if (!token) {
         showTemporaryError('Session expirée, veuillez vous reconnecter');
         return;

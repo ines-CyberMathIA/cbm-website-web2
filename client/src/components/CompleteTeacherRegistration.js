@@ -67,7 +67,7 @@ const CompleteTeacherRegistration = () => {
 
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
-      navigate('/teacher-dashboard');
+      navigate('/teacher/dashboard');
     } catch (error) {
       console.error('Erreur lors de la finalisation:', error);
       setError(error.response?.data?.message || 'Erreur lors de la création du compte');

@@ -10,7 +10,11 @@ const Overview = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
+        if (!token) {
+          throw new Error('Token non trouvé');
+        }
+
         const headers = { Authorization: `Bearer ${token}` };
 
         // Récupérer les statistiques
@@ -28,9 +32,9 @@ const Overview = () => {
         setConnections(connectionsResponse.data);
 
         setLoading(false);
-      } catch (err) {
-        console.error('Erreur lors du chargement des données:', err);
-        setError('Erreur lors du chargement des données');
+      } catch (error) {
+        console.error('Erreur détaillée:', error);
+        setError(error.response?.data?.message || 'Erreur lors du chargement des données');
         setLoading(false);
       }
     };
