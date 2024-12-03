@@ -23,6 +23,8 @@ const AuthRedirect = ({ to }) => {
 };
 
 function App() {
+  const [isDarkMode, setIsDarkMode] = React.useState(false);
+
   const isAuthenticated = () => {
     try {
       const token = sessionStorage.getItem('token');
@@ -61,13 +63,13 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen">
-        <Navbar />
+        <Navbar isDarkMode={isDarkMode} />
         <Routes>
           <Route path="/" element={
             isAuthenticated() ? (
               <AuthRedirect to={`/${getUserRole()}/dashboard`} />
             ) : (
-              <HeroSection />
+              <HeroSection isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
             )
           } />
           
