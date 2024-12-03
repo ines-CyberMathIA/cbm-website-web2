@@ -243,87 +243,52 @@ const HeroSection = () => {
       </motion.button>
 
       {/* Contenu principal */}
-      <div className="relative z-10 container mx-auto px-4 py-32">
-        <div className="flex flex-col items-center justify-center text-center space-y-24">
+      <div className="relative z-10 flex items-center justify-center min-h-screen">
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.8 }}
+          className="text-center px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto -mt-16"
+        >
+          <h1 className={`text-6xl sm:text-7xl md:text-8xl font-bold mb-16 ${
+            isDarkMode ? 'text-white' : 'text-gray-900'
+          } leading-tight`}>
+            <span className="bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+              CyberMathIA
+            </span>
+          </h1>
+          
+          <h2 className={`text-xl sm:text-2xl md:text-3xl mb-16 leading-relaxed max-w-4xl mx-auto ${
+            isDarkMode ? 'text-gray-300' : 'text-gray-700'
+          }`}>
+            votre site de{' '}
+            <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent font-medium">
+              soutien scolaire
+            </span>{' '}
+            qui vous propose un{' '}
+            <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent font-medium">
+              accompagnement quotidien
+            </span>{' '}
+            et des ressources de qualité pour faire{' '}
+            <span className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent font-medium">
+              décoller vos moyennes
+            </span>
+          </h2>
+          
+          {/* Bouton CTA */}
           <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={textVariants}
-            custom={1}
-            className="space-y-8"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            <motion.h1 className={`text-8xl font-bold ${isDarkMode ? 'text-[#e0e4ff]' : 'text-[#2d3154]'} mb-16`}>
-              <motion.span className={`bg-gradient-to-r ${isDarkMode ? 'from-[#00ffff] via-[#33ccff] to-[#66b3ff]' : lightColors.gradients.title1} bg-clip-text text-transparent`}>
-                Cyber
-              </motion.span>
-              <motion.span className={`bg-gradient-to-r ${isDarkMode ? 'from-[#66b3ff] via-[#9999ff] to-[#cc80ff]' : lightColors.gradients.title2} bg-clip-text text-transparent`}>
-                Math
-              </motion.span>
-              <motion.span className={`bg-gradient-to-r ${isDarkMode ? 'from-[#9999ff] to-[#cc80ff]' : lightColors.gradients.title3} bg-clip-text text-transparent`}>
-                IA
-              </motion.span>
-            </motion.h1>
-
-            <motion.h2
-              className={`text-4xl ${isDarkMode ? 'text-[#e0e4ff]' : 'text-[#2d3154]'} font-medium leading-relaxed max-w-5xl mx-auto`}
-              variants={textVariants}
-              custom={2}
-            >
-              votre site de{' '}
-              <span className={`bg-gradient-to-r ${isDarkMode ? 'from-[#00ffff] via-[#33ccff] to-[#66b3ff]' : lightColors.gradients.title1} bg-clip-text text-transparent`}>
-                soutien scolaire en ligne
-              </span>{' '}
-              qui vous propose un{' '}
-              <span className={`bg-gradient-to-r ${isDarkMode ? 'from-[#66b3ff] via-[#9999ff] to-[#cc80ff]' : lightColors.gradients.title2} bg-clip-text text-transparent`}>
-                accompagnement quotidien
-              </span>{' '}
-              et des ressources de qualité pour faire{' '}
-              <span className={`bg-gradient-to-r ${isDarkMode ? 'from-[#9999ff] to-[#cc80ff]' : lightColors.gradients.title3} bg-clip-text text-transparent`}>
-                décoller vos moyennes
+            <button className="group relative px-12 py-5">
+              <span className={`relative z-10 ${isDarkMode ? 'text-[#e0e4ff]' : 'text-[#2d3154]'} font-medium text-lg`}>
+                Découvrir
               </span>
-            </motion.h2>
+              <div className="absolute inset-0 bg-gradient-to-r from-[#6e8eff]/90 to-[#8b9eff]/90 rounded-full transform group-hover:scale-110 transition-transform duration-300"></div>
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-[#6e8eff] to-[#8b9eff] rounded-full opacity-0 group-hover:opacity-100 blur transition-opacity duration-300"></div>
+            </button>
           </motion.div>
-
-          {/* Boutons d'action */}
-          <motion.div 
-            className="flex justify-center gap-16 mt-24"
-            initial="hidden"
-            animate="visible"
-            variants={textVariants}
-            custom={3}
-          >
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Link
-                to="/login"
-                className="group relative px-12 py-5"
-              >
-                <span className={`relative z-10 ${isDarkMode ? 'text-[#e0e4ff]' : 'text-[#2d3154]'} font-medium text-lg`}>
-                  Commencer l'expérience
-                </span>
-                <div className={`absolute inset-0 bg-gradient-to-r ${isDarkMode ? 'from-[#6e8eff]/90' : 'from-[#6e8eff]/90'} to-[#8b9eff]/90 rounded-full transform group-hover:scale-110 transition-transform duration-300`}></div>
-                <div className={`absolute -inset-0.5 bg-gradient-to-r ${isDarkMode ? 'from-[#6e8eff]' : 'from-[#6e8eff]'} to-[#8b9eff] rounded-full opacity-0 group-hover:opacity-100 blur-sm transition-opacity duration-300`}></div>
-              </Link>
-            </motion.div>
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Link
-                to="/register"
-                className="group relative px-12 py-5"
-              >
-                <span className={`relative z-10 ${isDarkMode ? 'text-[#b8c3ff]' : 'text-[#1a1b2e]'} font-medium text-lg group-hover:${isDarkMode ? 'text-[#e0e4ff]' : 'text-[#2d3154]'} transition-colors duration-300`}>
-                  En savoir plus
-                </span>
-                <div className={`absolute inset-0 border-2 border-[${isDarkMode ? '#8b9eff' : '#6e8eff'}] rounded-full transform group-hover:scale-110 group-hover:border-opacity-100 transition-all duration-300`}></div>
-                <div className={`absolute inset-0 bg-gradient-to-r ${isDarkMode ? 'from-[#6e8eff]/90' : 'from-[#6e8eff]/90'} to-[#8b9eff]/90 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
-              </Link>
-            </motion.div>
-          </motion.div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );
