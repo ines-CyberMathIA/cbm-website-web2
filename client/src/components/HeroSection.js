@@ -57,57 +57,175 @@ const HeroSection = () => {
         <div className={`absolute inset-0 bg-gradient-to-tr ${isDarkMode ? 'from-[#2d3154]/40' : 'from-[#e0e4ff]/40'} via-transparent ${isDarkMode ? 'to-[#384878]/30' : 'to-[#b8c3ff]/30'} clip-diagonal transition-colors duration-500`}></div>
       </div>
 
-      {/* Formes abstraites en arrière-plan */}
+      {/* Formes cyberpunk en arrière-plan */}
       <div className="absolute inset-0 overflow-hidden">
-        {/* Cercle flou en haut à droite */}
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 0.15 }}
-          transition={{ duration: 1.5, ease: "easeOut" }}
-          className={`absolute -top-32 -right-32 w-96 h-96 rounded-full ${
-            isDarkMode ? 'bg-purple-600' : 'bg-purple-300'
-          } blur-3xl`}
-        />
-        
-        {/* Forme ondulée en bas à gauche */}
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 0.1 }}
-          transition={{ duration: 1.5, delay: 0.2, ease: "easeOut" }}
-          className={`absolute -bottom-32 -left-32 w-96 h-96 ${
-            isDarkMode ? 'bg-cyan-600' : 'bg-cyan-300'
-          } blur-3xl transform rotate-45`}
-        />
-
-        {/* Petits points décoratifs */}
+        {/* Étoiles scintillantes */}
         <div className="absolute top-0 left-0 w-full h-full">
-          {[...Array(20)].map((_, i) => (
-            <motion.div
-              key={i}
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 0.3 }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
-              className={`absolute w-2 h-2 rounded-full ${
-                isDarkMode ? 'bg-gray-400' : 'bg-gray-600'
-              }`}
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                transform: 'translate(-50%, -50%)'
-              }}
-            />
-          ))}
+          {isDarkMode ? (
+            [...Array(70)].map((_, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0.1 }}
+                animate={{ opacity: [0.1, 0.8, 0.1] }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  delay: i * 0.1,
+                  ease: "easeInOut"
+                }}
+                className={`absolute w-1 h-1 ${
+                  isDarkMode ? 'bg-white' : 'bg-gray-800'
+                }`}
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
+                }}
+              />
+            ))
+          ) : (
+            [...Array(30)].map((_, i) => (
+              <motion.div
+                key={i}
+                initial={{ scale: 0.8 }}
+                animate={{ 
+                  scale: [0.8, 1.1, 0.8],
+                  y: [0, -15, 0]
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  delay: i * 0.2,
+                  ease: "easeInOut"
+                }}
+                className={`absolute rounded-full ${
+                  i % 3 === 0 ? 'bg-blue-200' :
+                  i % 3 === 1 ? 'bg-purple-200' :
+                  'bg-pink-200'
+                } mix-blend-multiply`}
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  width: `${Math.random() * 20 + 10}px`,
+                  height: `${Math.random() * 20 + 10}px`,
+                  opacity: 0.4
+                }}
+              />
+            ))
+          )}
         </div>
 
-        {/* Forme abstraite au centre */}
+        {/* Formes géométriques cyberpunk */}
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 0.1 }}
-          transition={{ duration: 1.5, delay: 0.4, ease: "easeOut" }}
-          className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] ${
-            isDarkMode ? 'bg-pink-600' : 'bg-pink-300'
-          } blur-3xl rounded-full mix-blend-multiply`}
+          className={`absolute top-20 right-20 w-40 h-40 ${
+            isDarkMode 
+              ? 'border-cyan-500 border-2 opacity-20' 
+              : 'bg-gradient-to-br from-blue-300/30 to-cyan-300/30'
+          }`}
+          initial={{ rotate: 0 }}
+          animate={{ rotate: 360 }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          style={{
+            clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)'
+          }}
         />
+
+        <motion.div
+          className={`absolute bottom-40 left-20 w-60 h-60 ${
+            isDarkMode 
+              ? 'border-purple-500 border-2 opacity-20'
+              : 'bg-gradient-to-br from-purple-300/30 to-pink-300/30'
+          }`}
+          initial={{ rotate: 45 }}
+          animate={{ rotate: 405 }}
+          transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+          style={{
+            clipPath: 'polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%)'
+          }}
+        />
+
+        {/* Lignes angulaires animées */}
+        {isDarkMode ? (
+          <svg className="absolute inset-0 w-full h-full" style={{ opacity: 0.1 }}>
+            <motion.path
+              d={`M0,100 L${window.innerWidth},${window.innerHeight/2}`}
+              stroke="#fff"
+              strokeWidth="1"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
+              fill="none"
+            />
+            <motion.path
+              d={`M${window.innerWidth},0 L0,${window.innerHeight}`}
+              stroke="#fff"
+              strokeWidth="1"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 2, delay: 1, repeat: Infinity, repeatType: "reverse" }}
+              fill="none"
+            />
+          </svg>
+        ) : (
+          [...Array(3)].map((_, i) => (
+            <motion.div
+              key={`wave-${i}`}
+              className="absolute w-full h-32 opacity-10"
+              style={{
+                top: `${20 + i * 30}%`,
+                background: `linear-gradient(90deg, transparent, ${
+                  i % 2 === 0 ? '#818cf8' : '#c084fc'
+                }20, transparent)`,
+                transform: `rotate(${-5 + i * 5}deg)`
+              }}
+              animate={{
+                y: [0, 10, 0]
+              }}
+              transition={{
+                duration: 5,
+                delay: i * 0.5,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+            />
+          ))
+        )}
+
+        {/* Hexagones flottants */}
+        {[...Array(3)].map((_, i) => (
+          <motion.div
+            key={`hex-${i}`}
+            className={`absolute w-32 h-32 ${
+              isDarkMode 
+                ? 'border-pink-500 border opacity-10'
+                : 'bg-gradient-to-br from-indigo-300/20 to-purple-300/20'
+            }`}
+            initial={{ y: 0, rotate: 0 }}
+            animate={{ 
+              y: [0, -20, 0],
+              rotate: 360
+            }}
+            transition={{
+              y: {
+                duration: 3,
+                repeat: Infinity,
+                delay: i * 1,
+                ease: "easeInOut"
+              },
+              rotate: {
+                duration: 20,
+                repeat: Infinity,
+                delay: i * 2,
+                ease: "linear"
+              }
+            }}
+            style={{
+              left: `${25 + i * 25}%`,
+              top: `${30 + i * 20}%`,
+              clipPath: 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)'
+            }}
+          />
+        ))}
       </div>
 
       {/* Bouton de changement de mode */}
