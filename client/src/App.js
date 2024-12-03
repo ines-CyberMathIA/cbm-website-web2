@@ -8,6 +8,7 @@ import ParentDashboard from './components/ParentDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
 import ManagerDashboard from './components/ManagerDashboard';
 import HeroSection from './components/HeroSection';
+import Navbar from './components/Navbar';
 import PrivateRoute from './components/PrivateRoute';
 import CompleteManagerRegistration from './components/CompleteManagerRegistration';
 import CompleteTeacherRegistration from './components/CompleteTeacherRegistration';
@@ -59,7 +60,8 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-100">
+      <div className="min-h-screen">
+        <Navbar />
         <Routes>
           <Route path="/" element={
             isAuthenticated() ? (
