@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Login from './components/Login';
 import Register from './components/Register';
 import AdminLogin from './components/AdminLogin';
@@ -67,10 +67,20 @@ function App() {
     }
   };
 
+  const PublicNavbar = () => {
+    const location = useLocation();
+    const publicPaths = ['/', '/login', '/register'];
+    const shouldShowNavbar = publicPaths.includes(location.pathname);
+    
+    return shouldShowNavbar ? (
+      <Navbar isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
+    ) : null;
+  };
+
   return (
     <Router>
-      <div className="min-h-screen">
-        <Navbar isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
+      <div className={`min-h-screen ${isDarkMode ? 'bg-[#1a1b2e]' : 'bg-gray-50'}`}>
+        <PublicNavbar />
         <Routes>
           <Route path="/" element={
             isAuthenticated() ? (

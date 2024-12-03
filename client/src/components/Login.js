@@ -82,7 +82,7 @@ const Login = ({ isDarkMode }) => {
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-[#1a1b2e]' : 'bg-gray-50'} relative overflow-hidden flex flex-col justify-center py-12 sm:px-6 lg:px-8`}>
       {/* Formes décoratives */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Étoiles/Bulles */}
         <div className="absolute top-0 left-0 w-full h-full">
           {isDarkMode ? (
@@ -156,7 +156,7 @@ const Login = ({ isDarkMode }) => {
       </div>
 
       {/* Contenu du formulaire */}
-      <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-md">
+      <div className="relative z-20 sm:mx-auto sm:w-full sm:max-w-md">
         <Link to="/" className="flex justify-center">
           <span className={`text-4xl font-bold bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 bg-clip-text text-transparent`}>
             CyberMathIA
@@ -173,8 +173,8 @@ const Login = ({ isDarkMode }) => {
         <div className={`${
           isDarkMode 
             ? 'bg-[#2d3154]/50 backdrop-blur-lg border border-gray-700' 
-            : 'bg-white'
-        } py-8 px-4 shadow-xl rounded-2xl sm:px-10`}>
+            : 'bg-white/90 backdrop-blur-lg shadow-xl'
+        } py-8 px-4 rounded-2xl sm:px-10 relative z-20`}>
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
               <div className={`${
@@ -309,6 +309,44 @@ const Login = ({ isDarkMode }) => {
               </motion.div>
             </div>
           </form>
+
+          {/* Section création de compte */}
+          <div className="mt-8 relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className={`w-full ${isDarkMode ? 'border-t border-gray-700' : 'border-t border-gray-300'}`}></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className={`px-4 ${isDarkMode ? 'bg-[#2d3154]/50 text-gray-300' : 'bg-white text-gray-500'}`}>
+                Pas encore de compte ?
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link
+                to="/register"
+                className="group relative w-full flex justify-center px-12 py-3"
+              >
+                <span className={`relative z-10 ${isDarkMode ? 'text-[#e0e4ff]' : 'text-[#2d3154]'} font-medium`}>
+                  Créer un compte gratuitement
+                </span>
+                <div className={`absolute inset-0 ${
+                  isDarkMode 
+                    ? 'bg-[#2d3154]/50 group-hover:bg-[#2d3154]/70' 
+                    : 'bg-gray-50 group-hover:bg-gray-100'
+                } rounded-full transform transition-all duration-300`}></div>
+                <div className={`absolute -inset-0.5 bg-gradient-to-r ${
+                  isDarkMode
+                    ? 'from-purple-500/50 to-pink-500/50'
+                    : 'from-indigo-500/30 to-purple-500/30'
+                } rounded-full opacity-0 group-hover:opacity-100 blur transition-opacity duration-300`}></div>
+              </Link>
+            </motion.div>
+          </div>
         </div>
       </div>
     </div>
