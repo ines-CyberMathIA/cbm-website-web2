@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 
-const HeroSection = () => {
-  const [isDarkMode, setIsDarkMode] = useState(true);
-
+const HeroSection = ({ isDarkMode }) => {
   const textVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: (custom) => ({
@@ -14,20 +11,6 @@ const HeroSection = () => {
       transition: { delay: custom * 0.2 }
     })
   };
-
-  // Appliquer le mode au body et sauvegarder la préférence
-  useEffect(() => {
-    document.body.style.backgroundColor = isDarkMode ? '#0a0b0f' : '#ffffff';
-    localStorage.setItem('darkMode', isDarkMode);
-  }, [isDarkMode]);
-
-  // Récupérer la préférence au chargement
-  useEffect(() => {
-    const savedMode = localStorage.getItem('darkMode');
-    if (savedMode !== null) {
-      setIsDarkMode(savedMode === 'true');
-    }
-  }, []);
 
   const darkColors = {
     bg: 'from-[#1a1b2e] via-[#16181f] to-[#0a0b0f]',
@@ -49,6 +32,10 @@ const HeroSection = () => {
   };
 
   const colors = isDarkMode ? darkColors : lightColors;
+
+  useEffect(() => {
+    document.body.style.backgroundColor = isDarkMode ? '#0a0b0f' : '#ffffff';
+  }, [isDarkMode]);
 
   return (
     <div className={`relative min-h-screen w-full overflow-hidden ${isDarkMode ? 'bg-[#0a0b0f]' : 'bg-white'}`}>
@@ -227,20 +214,6 @@ const HeroSection = () => {
           />
         ))}
       </div>
-
-      {/* Bouton de changement de mode */}
-      <motion.button
-        onClick={() => setIsDarkMode(!isDarkMode)}
-        className={`fixed top-8 right-8 p-3 rounded-full ${isDarkMode ? 'bg-[#e0e4ff]/10 hover:bg-[#e0e4ff]/20' : 'bg-[#1a1b2e]/10 hover:bg-[#1a1b2e]/20'} backdrop-blur-sm transition-all duration-300 z-50`}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-      >
-        {isDarkMode ? (
-          <SunIcon className="w-6 h-6 text-[#e0e4ff]" />
-        ) : (
-          <MoonIcon className="w-6 h-6 text-[#1a1b2e]" />
-        )}
-      </motion.button>
 
       {/* Contenu principal */}
       <div className="relative z-10 flex items-center justify-center min-h-screen">

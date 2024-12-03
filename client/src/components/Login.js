@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import axios from 'axios';
 
-const Login = () => {
+const Login = ({ isDarkMode }) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     role: '',
@@ -79,43 +80,126 @@ const Login = () => {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-gray-50 geometric-bg flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+    <div className={`min-h-screen ${isDarkMode ? 'bg-[#1a1b2e]' : 'bg-gray-50'} relative overflow-hidden flex flex-col justify-center py-12 sm:px-6 lg:px-8`}>
+      {/* Formes décoratives */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Étoiles/Bulles */}
+        <div className="absolute top-0 left-0 w-full h-full">
+          {isDarkMode ? (
+            // Étoiles pour le mode sombre
+            [...Array(40)].map((_, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0.1 }}
+                animate={{ opacity: [0.1, 0.8, 0.1] }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  delay: i * 0.1,
+                  ease: "easeInOut"
+                }}
+                className="absolute w-1 h-1 bg-white"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
+                }}
+              />
+            ))
+          ) : (
+            // Cercles colorés pour le mode clair
+            [...Array(20)].map((_, i) => (
+              <motion.div
+                key={i}
+                initial={{ scale: 0.8 }}
+                animate={{ 
+                  scale: [0.8, 1.1, 0.8],
+                  y: [0, -15, 0]
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  delay: i * 0.2,
+                  ease: "easeInOut"
+                }}
+                className={`absolute rounded-full ${
+                  i % 3 === 0 ? 'bg-blue-200' :
+                  i % 3 === 1 ? 'bg-purple-200' :
+                  'bg-pink-200'
+                } mix-blend-multiply`}
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  width: `${Math.random() * 20 + 10}px`,
+                  height: `${Math.random() * 20 + 10}px`,
+                  opacity: 0.4
+                }}
+              />
+            ))
+          )}
+        </div>
+
+        {/* Formes géométriques */}
+        <motion.div
+          className={`absolute -top-20 -right-20 w-80 h-80 ${
+            isDarkMode 
+              ? 'border-purple-500 border-2 opacity-20' 
+              : 'bg-gradient-to-br from-purple-300/30 to-pink-300/30'
+          }`}
+          initial={{ rotate: 0 }}
+          animate={{ rotate: 360 }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          style={{
+            clipPath: 'polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%)'
+          }}
+        />
+      </div>
+
+      {/* Contenu du formulaire */}
+      <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-md">
         <Link to="/" className="flex justify-center">
-          <span className="text-3xl font-bold text-indigo-600">CyberMathIA</span>
+          <span className={`text-4xl font-bold bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 bg-clip-text text-transparent`}>
+            CyberMathIA
+          </span>
         </Link>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+        <h2 className={`mt-6 text-center text-3xl font-extrabold ${
+          isDarkMode ? 'text-white' : 'text-gray-900'
+        }`}>
           Connexion à votre espace
         </h2>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow-xl rounded-2xl sm:px-10">
+        <div className={`${
+          isDarkMode 
+            ? 'bg-[#2d3154]/50 backdrop-blur-lg border border-gray-700' 
+            : 'bg-white'
+        } py-8 px-4 shadow-xl rounded-2xl sm:px-10`}>
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+              <div className={`${
+                isDarkMode ? 'bg-red-900/50 border-red-700 text-red-200' : 'bg-red-50 border-red-400 text-red-700'
+              } border px-4 py-3 rounded relative`} role="alert">
                 <span className="block sm:inline">{error}</span>
-                {error.includes('créer un compte') && (
-                  <Link 
-                    to="/register" 
-                    className="block mt-2 text-red-700 underline hover:text-red-800"
-                  >
-                    Créer un compte
-                  </Link>
-                )}
               </div>
             )}
             
             {/* Sélection du rôle */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className={`block text-sm font-medium ${
+                isDarkMode ? 'text-gray-200' : 'text-gray-700'
+              }`}>
                 Je suis...
               </label>
               <select
                 name="role"
                 value={formData.role}
                 onChange={handleChange}
-                className="mt-1 block w-full pl-3 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-xl"
+                className={`mt-1 block w-full pl-3 pr-10 py-3 text-base ${
+                  isDarkMode 
+                    ? 'bg-[#1a1b2e] border-gray-700 text-white focus:ring-purple-500 focus:border-purple-500' 
+                    : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                } focus:outline-none rounded-xl`}
                 required
               >
                 <option value="">Sélectionnez votre profil</option>
@@ -129,7 +213,9 @@ const Login = () => {
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className={`block text-sm font-medium ${
+                isDarkMode ? 'text-gray-200' : 'text-gray-700'
+              }`}>
                 Email
               </label>
               <div className="mt-1">
@@ -140,14 +226,20 @@ const Login = () => {
                   onChange={handleChange}
                   required
                   autoComplete="email"
-                  className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  className={`appearance-none block w-full px-3 py-3 border ${
+                    isDarkMode 
+                      ? 'bg-[#1a1b2e] border-gray-700 text-white placeholder-gray-500 focus:ring-purple-500 focus:border-purple-500' 
+                      : 'border-gray-300 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500'
+                  } rounded-xl shadow-sm focus:outline-none`}
                 />
               </div>
             </div>
 
             {/* Mot de passe */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className={`block text-sm font-medium ${
+                isDarkMode ? 'text-gray-200' : 'text-gray-700'
+              }`}>
                 Mot de passe
               </label>
               <div className="mt-1">
@@ -157,17 +249,13 @@ const Login = () => {
                   value={formData.password}
                   onChange={handleChange}
                   required
-                  autoComplete="current-password"
-                  autoCapitalize="off"  // Désactiver l'auto-capitalisation
-                  autoCorrect="off"     // Désactiver l'auto-correction
-                  spellCheck="false"    // Désactiver la vérification orthographique
-                  className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  style={{ textTransform: 'none' }}  // Empêcher toute transformation CSS
+                  className={`appearance-none block w-full px-3 py-3 border ${
+                    isDarkMode 
+                      ? 'bg-[#1a1b2e] border-gray-700 text-white placeholder-gray-500 focus:ring-purple-500 focus:border-purple-500' 
+                      : 'border-gray-300 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500'
+                  } rounded-xl shadow-sm focus:outline-none`}
                 />
               </div>
-              <p className="mt-1 text-sm text-gray-500">
-                Entrez votre mot de passe exactement comme lors de l'inscription
-              </p>
             </div>
 
             {/* Options de connexion */}
@@ -177,15 +265,25 @@ const Login = () => {
                   id="remember-me"
                   name="remember-me"
                   type="checkbox"
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  className={`h-4 w-4 ${
+                    isDarkMode 
+                      ? 'text-purple-600 border-gray-700 focus:ring-purple-500' 
+                      : 'text-indigo-600 border-gray-300 focus:ring-indigo-500'
+                  } rounded`}
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+                <label htmlFor="remember-me" className={`ml-2 block text-sm ${
+                  isDarkMode ? 'text-gray-200' : 'text-gray-900'
+                }`}>
                   Se souvenir de moi
                 </label>
               </div>
 
               <div className="text-sm">
-                <Link to="/forgot-password" className="font-medium text-indigo-600 hover:text-indigo-500">
+                <Link to="/forgot-password" className={`font-medium ${
+                  isDarkMode 
+                    ? 'text-purple-400 hover:text-purple-300' 
+                    : 'text-indigo-600 hover:text-indigo-500'
+                }`}>
                   Mot de passe oublié ?
                 </Link>
               </div>
@@ -193,50 +291,28 @@ const Login = () => {
 
             {/* Bouton de connexion */}
             <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.95 }}
               >
-                {loading ? (
-                  <span className="flex items-center">
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Connexion en cours...
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="group relative w-full px-12 py-3"
+                >
+                  <span className={`relative z-10 ${isDarkMode ? 'text-[#e0e4ff]' : 'text-[#2d3154]'} font-medium text-lg`}>
+                    {loading ? 'Connexion...' : 'Se connecter'}
                   </span>
-                ) : (
-                  'Se connecter'
-                )}
-              </button>
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#6e8eff]/90 to-[#8b9eff]/90 rounded-full transform group-hover:scale-105 transition-transform duration-300"></div>
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-[#6e8eff] to-[#8b9eff] rounded-full opacity-0 group-hover:opacity-100 blur transition-opacity duration-300"></div>
+                </button>
+              </motion.div>
             </div>
           </form>
-
-          {/* Lien d'inscription */}
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Pas encore de compte ?</span>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <Link
-                to="/register"
-                className="w-full flex justify-center py-3 px-4 border border-indigo-600 rounded-xl shadow-sm text-sm font-medium text-indigo-600 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Créer un compte gratuitement
-              </Link>
-            </div>
-          </div>
         </div>
       </div>
     </div>
   );
 };
 
-export default Login; 
+export default Login;

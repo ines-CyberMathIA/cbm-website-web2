@@ -23,7 +23,14 @@ const AuthRedirect = ({ to }) => {
 };
 
 function App() {
-  const [isDarkMode, setIsDarkMode] = React.useState(false);
+  const [isDarkMode, setIsDarkMode] = React.useState(() => {
+    const savedMode = localStorage.getItem('darkMode');
+    return savedMode ? JSON.parse(savedMode) : false;
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
+  }, [isDarkMode]);
 
   const isAuthenticated = () => {
     try {
@@ -63,7 +70,7 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen">
-        <Navbar isDarkMode={isDarkMode} />
+        <Navbar isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
         <Routes>
           <Route path="/" element={
             isAuthenticated() ? (
@@ -77,7 +84,7 @@ function App() {
             isAuthenticated() ? (
               <AuthRedirect to={`/${getUserRole()}/dashboard`} />
             ) : (
-              <Login />
+              <Login isDarkMode={isDarkMode} />
             )
           } />
           
