@@ -15,6 +15,7 @@ const Calendar = ({ isDarkMode }) => {
   const [viewMode, setViewMode] = useState('week');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [mode, setMode] = useState('view');
+  const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
 
   const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
   const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
@@ -26,11 +27,18 @@ const Calendar = ({ isDarkMode }) => {
     return `${hour.toString().padStart(2, '0')}:${minute}`;
   });
 
+  // Au début du composant Calendar, ajouter la configuration du fuseau horaire
+  const parisTimeZone = 'Europe/Paris';
+
+  // Fonction pour obtenir une date dans le fuseau horaire de Paris
+  const getParisDate = (date) => {
+    return new Date(date.toLocaleString('en-US', { timeZone: parisTimeZone }));
+  };
+
   const getVisibleDays = () => {
-    // On s'assure que la date est dans le bon fuseau horaire
-    const adjustedDate = new Date(currentDate);
-    adjustedDate.setHours(adjustedDate.getHours() - adjustedDate.getTimezoneOffset() / 60);
-    const currentDayIndex = adjustedDate.getDay() === 0 ? 6 : adjustedDate.getDay() - 1;
+    // Obtenir la date dans le fuseau horaire de Paris
+    const currentDayDate = getParisDate(new Date(currentDate));
+    const currentDayIndex = currentDayDate.getDay() === 0 ? 6 : currentDayDate.getDay() - 1;
     const currentDayName = days[currentDayIndex];
     
     switch (viewMode) {
@@ -232,11 +240,30 @@ const Calendar = ({ isDarkMode }) => {
           </div>
           
           {/* En-têtes des jours */}
-          {getVisibleDays().map(day => {
-            // Obtenir la date d'aujourd'hui
-            const today = new Date();
-            // Vérifier si le jour est aujourd'hui en comparant avec today au lieu de currentDate
-            const isToday = day === days[today.getDay() === 0 ? 6 : today.getDay() - 1];
+          {getVisibleDays().map((day, index) => {
+            // Obtenir la date d'aujourd'hui dans le fuseau horaire de Paris
+            const today = getParisDate(new Date());
+            
+            // Calculer la date pour chaque jour selon le mode
+            const currentDayDate = getParisDate(new Date(currentDate));
+            let dayDate;
+            
+            if (viewMode === 'day') {
+              // En mode jour, utiliser directement la date sélectionnée sans modification
+              dayDate = currentDayDate;
+            } else {
+              // En mode semaine, calculer à partir du lundi
+              const monday = new Date(currentDayDate);
+              monday.setDate(currentDayDate.getDate() - (currentDayDate.getDay() || 7) + 1);
+              dayDate = new Date(monday);
+              dayDate.setDate(monday.getDate() + index);
+            }
+            
+            // Vérifier si c'est aujourd'hui
+            const isToday = 
+              today.getDate() === dayDate.getDate() &&
+              today.getMonth() === dayDate.getMonth() &&
+              today.getFullYear() === dayDate.getFullYear();
             
             return (
               <div
@@ -246,7 +273,7 @@ const Calendar = ({ isDarkMode }) => {
                     ? 'text-gray-100 border-gray-700' 
                     : 'text-gray-800 border-gray-200'
                 } ${
-                  isToday  // Utiliser isToday au lieu de isCurrentDay
+                  isToday
                     ? isDarkMode
                       ? 'bg-blue-800/40'
                       : 'bg-blue-100'
@@ -255,7 +282,7 @@ const Calendar = ({ isDarkMode }) => {
               >
                 <span>{day.substring(0, 3)}</span>
                 <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  {currentDate.getDate()}
+                  {dayDate.getDate()}
                 </span>
               </div>
             );
@@ -276,7 +303,7 @@ const Calendar = ({ isDarkMode }) => {
               {timeSlots.map((time) => (
                 <div
                   key={time}
-                  className={`p-1.5 sm:p-2 lg:p-4 text-xs sm:text-sm border-b ${
+                  className={`h-[40px] p-1.5 sm:p-2 lg:p-4 text-xs sm:text-sm border-b flex items-center ${
                     isDarkMode
                       ? 'border-gray-700 text-gray-300'
                       : 'border-gray-200 text-gray-600'
@@ -302,7 +329,7 @@ const Calendar = ({ isDarkMode }) => {
                     <motion.div
                       key={`${day}-${time}`}
                       className={`
-                        p-1.5 sm:p-2 lg:p-4 border-b cursor-pointer
+                        h-[40px] p-1.5 sm:p-2 lg:p-4 border-b cursor-pointer
                         ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}
                         ${isAvailable && mode === 'view' ?
                           (isDarkMode ? 'bg-green-800/40' : 'bg-green-100') :
@@ -501,6 +528,25 @@ const Calendar = ({ isDarkMode }) => {
     }
   };
 
+  // Dans le composant Calendar, modifier la partie des boutons de la sidebar
+  const sidebarButtons = [
+    {
+      mode: 'view',
+      label: 'Voir',
+      icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z'
+    },
+    {
+      mode: 'add',
+      label: 'Ajouter',
+      icon: 'M12 6v6m0 0v6m0-6h6m-6 0H6'
+    },
+    {
+      mode: 'delete',
+      label: 'Supprimer',
+      icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+    }
+  ];
+
   return (
     <div className="w-full h-[calc(100vh-6rem)] p-2 sm:p-4 mb-8">
       <div className={`flex flex-col lg:flex-row rounded-2xl shadow-lg overflow-hidden h-full ${
@@ -552,43 +598,6 @@ const Calendar = ({ isDarkMode }) => {
                   </h2>
                 </div>
 
-                {/* Sélecteur de vue */}
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <div className={`h-px flex-1 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
-                    <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Vision</span>
-                    <div className={`h-px flex-1 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
-                  </div>
-                  <div className="flex flex-row lg:flex-col space-x-2 lg:space-x-0 lg:space-y-2">
-                    {[
-                      { id: 'month', label: 'Mois' },
-                      { id: 'week', label: 'Semaine' },
-                      { id: '3days', label: '3 Jours' },
-                      { id: 'day', label: 'Jour' }
-                    ].map(({ id, label }) => (
-                      <motion.button
-                        key={id}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setViewMode(id)}
-                        className={`
-                          flex-1 lg:flex-none px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all
-                          ${viewMode === id
-                            ? isDarkMode
-                              ? 'bg-purple-600 text-white'
-                              : 'bg-purple-100 text-purple-700'
-                            : isDarkMode
-                              ? 'text-gray-300 hover:bg-gray-700'
-                              : 'text-gray-600 hover:bg-gray-100'
-                          }
-                        `}
-                      >
-                        {label}
-                      </motion.button>
-                    ))}
-                  </div>
-                </div>
-
                 {/* Boutons d'action */}
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2">
@@ -597,7 +606,7 @@ const Calendar = ({ isDarkMode }) => {
                     <div className={`h-px flex-1 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
                   </div>
                   <div className="flex flex-row lg:flex-col space-x-2 lg:space-x-0 lg:space-y-2">
-                    {['view', 'add', 'delete'].map((buttonMode) => (
+                    {sidebarButtons.map(({ mode: buttonMode, label, icon }) => (
                       <motion.button
                         key={buttonMode}
                         whileHover={{ scale: 1.02 }}
@@ -609,7 +618,7 @@ const Calendar = ({ isDarkMode }) => {
                         }}
                         className={`
                           flex-1 lg:flex-none px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all
-                          ${mode === buttonMode
+                          ${mode === buttonMode  // Comparer mode (état) avec buttonMode (prop du bouton)
                             ? isDarkMode
                               ? 'bg-indigo-600 text-white'
                               : 'bg-indigo-100 text-indigo-700'
@@ -619,7 +628,7 @@ const Calendar = ({ isDarkMode }) => {
                           }
                         `}
                       >
-                        {buttonMode === 'view' ? 'Voir' : buttonMode === 'add' ? 'Ajouter' : 'Supprimer'}
+                        {label}
                       </motion.button>
                     ))}
                   </div>
@@ -656,9 +665,8 @@ const Calendar = ({ isDarkMode }) => {
         {/* Contenu principal */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {/* Barre de navigation */}
-          <div className={`flex items-center justify-between p-4 border-b ${
-            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-          }`}>
+          <div className="flex items-center justify-between p-4">
+            {/* Navigation et titre */}
             <div className="flex items-center space-x-4">
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -674,13 +682,13 @@ const Calendar = ({ isDarkMode }) => {
                   <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
               </motion.button>
-              
+
               <h2 className={`text-lg font-semibold ${
                 isDarkMode ? 'text-gray-100' : 'text-gray-800'
               }`}>
                 {formatPeriodLabel()}
               </h2>
-              
+
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -696,12 +704,58 @@ const Calendar = ({ isDarkMode }) => {
                 </svg>
               </motion.button>
             </div>
+
+            {/* Menu de vision */}
+            <div className="relative">
+              <button
+                onClick={() => setIsViewMenuOpen(!isViewMenuOpen)}
+                className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium ${
+                  isDarkMode 
+                    ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' 
+                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                } border ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}
+              >
+                <span>Vision {viewMode === 'day' ? 'Jour' : viewMode === 'week' ? 'Semaine' : 'Mois'}</span>
+                <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Menu déroulant */}
+              {isViewMenuOpen && (
+                <div className={`absolute right-0 mt-2 w-40 rounded-md shadow-lg ${
+                  isDarkMode ? 'bg-gray-800' : 'bg-white'
+                } ring-1 ring-black ring-opacity-5 z-50`}>
+                  <div className="py-1" role="menu">
+                    {['day', 'week', 'month'].map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => {
+                          setViewMode(mode);
+                          setIsViewMenuOpen(false);
+                        }}
+                        className={`block w-full text-left px-4 py-2 text-sm ${
+                          isDarkMode
+                            ? 'text-gray-200 hover:bg-gray-700'
+                            : 'text-gray-700 hover:bg-gray-100'
+                        } ${viewMode === mode ? 'font-medium' : ''}`}
+                      >
+                        {mode === 'day' ? 'Jour' : mode === 'week' ? 'Semaine' : 'Mois'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Conteneur du calendrier avec hauteur fixe et scroll */}
           <div className="flex-1 overflow-hidden">
             <div className="h-[calc(100vh-16rem)] overflow-y-auto">
-              {viewMode === 'month' ? renderMonthView() : renderWeekView()}
+              <div className="h-full flex flex-col relative">
+                {/* Contenu du calendrier */}
+                {viewMode === 'month' ? renderMonthView() : renderWeekView()}
+              </div>
             </div>
           </div>
         </div>
