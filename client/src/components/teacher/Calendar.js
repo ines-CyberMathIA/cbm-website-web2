@@ -27,18 +27,39 @@ const Calendar = ({ isDarkMode }) => {
   });
 
   const getVisibleDays = () => {
+    // On s'assure que la date est dans le bon fuseau horaire
+    const adjustedDate = new Date(currentDate);
+    adjustedDate.setHours(adjustedDate.getHours() - adjustedDate.getTimezoneOffset() / 60);
+    const currentDayIndex = adjustedDate.getDay() === 0 ? 6 : adjustedDate.getDay() - 1;
+    const currentDayName = days[currentDayIndex];
+    
     switch (viewMode) {
       case 'day':
-        return [days[currentDate.getDay()]];
-      case '3days': {
-        const currentDayIndex = currentDate.getDay();
-        return days.slice(currentDayIndex, currentDayIndex + 3);
-      }
-      case 'month':
+        return [currentDayName];
+      case '3days':
+        return [
+          days[currentDayIndex],
+          days[(currentDayIndex + 1) % 7],
+          days[(currentDayIndex + 2) % 7]
+        ];
+      case 'week':
         return days;
-      default: // 'week'
+      default:
         return days;
     }
+  };
+
+  const isCurrentDay = (date) => {
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+           date.getMonth() === today.getMonth() &&
+           date.getFullYear() === today.getFullYear();
+  };
+
+  const isToday = (dayName) => {
+    const today = new Date();
+    const currentDayName = days[today.getDay() === 0 ? 6 : today.getDay() - 1];
+    return dayName === currentDayName;
   };
 
   const getDaysInMonth = (date) => {
@@ -47,9 +68,10 @@ const Calendar = ({ isDarkMode }) => {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     
-    // Ajuster le premier jour pour commencer par lundi
-    let firstDayIndex = firstDay.getDay() - 1;
-    if (firstDayIndex === -1) firstDayIndex = 6;
+    // Ajuster le premier jour pour commencer par lundi (1 = Lundi, 0 = Dimanche)
+    let firstDayIndex = firstDay.getDay();
+    if (firstDayIndex === 0) firstDayIndex = 7; // Si c'est dimanche (0), on le met à 7
+    firstDayIndex--; // On soustrait 1 pour avoir lundi = 0
     
     const daysArray = [];
     
@@ -57,30 +79,40 @@ const Calendar = ({ isDarkMode }) => {
     const prevMonth = new Date(year, month, 0);
     const prevMonthDays = prevMonth.getDate();
     for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const prevDate = new Date(year, month - 1, prevMonthDays - i);
       daysArray.push({
-        date: new Date(year, month - 1, prevMonthDays - i),
+        date: prevDate,
         isCurrentMonth: false
       });
     }
     
     // Ajouter les jours du mois en cours
     for (let i = 1; i <= lastDay.getDate(); i++) {
+      const currentDate = new Date(year, month, i);
       daysArray.push({
-        date: new Date(year, month, i),
+        date: currentDate,
         isCurrentMonth: true
       });
     }
     
-    // Ajouter les jours du mois suivant
-    const remainingDays = 42 - daysArray.length; // 6 semaines * 7 jours
-    for (let i = 1; i <= remainingDays; i++) {
-      daysArray.push({
-        date: new Date(year, month + 1, i),
-        isCurrentMonth: false
-      });
+    // Calculer combien de jours du mois suivant sont nécessaires pour compléter la dernière semaine
+    const remainingDays = 7 - (daysArray.length % 7);
+    if (remainingDays < 7) {
+      for (let i = 1; i <= remainingDays; i++) {
+        const nextDate = new Date(year, month + 1, i);
+        daysArray.push({
+          date: nextDate,
+          isCurrentMonth: false
+        });
+      }
     }
     
     return daysArray;
+  };
+
+  const handleDayClick = (date) => {
+    setCurrentDate(date);
+    setViewMode('day');
   };
 
   const renderMonthView = () => {
@@ -90,7 +122,7 @@ const Calendar = ({ isDarkMode }) => {
       <>
         {/* En-tête du mois */}
         <div className={`p-4 border-b text-center ${
-          isDarkMode ? 'bg-gray-900 border-gray-700 text-gray-100' : 'bg-white border-gray-200 text-gray-800'
+          isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-100' : 'bg-white border-gray-200 text-gray-800'
         }`}>
           <h2 className="text-lg font-semibold">
             {months[currentDate.getMonth()]} {currentDate.getFullYear()}
@@ -119,26 +151,46 @@ const Calendar = ({ isDarkMode }) => {
             {/* Jours du mois */}
             <div className="grid grid-cols-7">
               {daysInMonth.map((day, index) => (
-                <div
+                <motion.div
                   key={index}
                   className={`
-                    min-h-[100px] p-2 border-b border-r relative
+                    min-h-[100px] p-2 border-b border-r relative cursor-pointer
                     ${isDarkMode 
                       ? 'border-gray-700' 
                       : 'border-gray-200'
                     }
                     ${!day.isCurrentMonth 
                       ? isDarkMode 
-                        ? 'bg-gray-800 text-gray-500' 
-                        : 'bg-gray-50 text-gray-400'
+                        ? 'bg-gray-900/30' 
+                        : 'bg-gray-50'
                       : isDarkMode
                         ? 'text-gray-100'
                         : 'text-gray-800'
                     }
+                    ${isCurrentDay(day.date) 
+                      ? isDarkMode
+                        ? 'bg-blue-800/20'
+                        : 'bg-blue-50'
+                      : ''
+                    }
+                    hover:bg-opacity-80
                   `}
+                  onClick={() => handleDayClick(day.date)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <span className="text-sm">{day.date.getDate()}</span>
-                </div>
+                  <span className={`text-sm ${
+                    isCurrentDay(day.date)
+                      ? isDarkMode
+                        ? 'text-blue-300'
+                        : 'text-blue-600'
+                      : !day.isCurrentMonth
+                        ? 'text-gray-400'
+                        : ''
+                  }`}>
+                    {day.date.getDate()}
+                  </span>
+                </motion.div>
               ))}
             </div>
           </div>
@@ -147,104 +199,132 @@ const Calendar = ({ isDarkMode }) => {
     );
   };
 
-  const renderWeekView = () => (
-    <>
-      {/* En-tête des jours (fixe) */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: `80px repeat(${getVisibleDays().length}, 1fr)`,
-          gridAutoFlow: 'column dense'
-        }}
-        className={`${
-          isDarkMode 
-            ? 'bg-gray-900 border-gray-700' 
-            : 'bg-white border-gray-200'
-        } border-b`}
-      >
-        <div className={`p-1.5 sm:p-2 lg:p-4 border-r text-xs sm:text-sm ${
-          isDarkMode ? 'border-gray-700 text-gray-200' : 'border-gray-200'
-        }`} />
-        {getVisibleDays().map(day => (
-          <div
-            key={day}
-            className={`p-1.5 sm:p-2 lg:p-4 text-center font-medium border-r text-xs sm:text-sm lg:text-base ${
-              isDarkMode 
-                ? 'text-gray-100 border-gray-700' 
-                : 'text-gray-800 border-gray-200'
-            }`}
-          >
-            {day.substring(0, 3)}
-          </div>
-        ))}
-      </div>
+  const formatDayViewDate = (date) => {
+    // S'assurer que nous utilisons une copie de la date
+    const d = new Date(date);
+    const dayName = days[d.getDay() === 0 ? 6 : d.getDay() - 1];
+    const dayNumber = d.getDate();
+    const monthName = months[d.getMonth()];
+    
+    return `${dayName} ${dayNumber} ${monthName}`;
+  };
 
-      {/* Grille scrollable */}
-      <div className={`flex-1 overflow-y-auto ${
-        isDarkMode ? 'bg-gray-900' : 'bg-white'
-      }`}>
-        <div className="grid h-full"
+  const renderWeekView = () => {
+    return (
+      <div className="flex flex-col h-full">
+        {/* En-tête des jours (fixe) */}
+        <div
           style={{
-            gridTemplateColumns: `80px repeat(${getVisibleDays().length}, 1fr)`
+            display: 'grid',
+            gridTemplateColumns: `80px repeat(${getVisibleDays().length}, 1fr)`,
           }}
+          className={`${
+            isDarkMode 
+              ? 'bg-gray-800 border border-gray-700' 
+              : 'bg-white border-gray-200'
+          } border-b`}
         >
-          {/* Colonne des horaires */}
-          <div className="grid auto-rows-fr">
-            {timeSlots.map(time => (
+          {/* Cellule vide pour l'alignement avec les heures */}
+          <div className={`p-1.5 sm:p-2 lg:p-4 border-r text-xs sm:text-sm ${
+            isDarkMode ? 'border-gray-700 text-gray-200' : 'border-gray-200'
+          }`}>
+            {/* Laisser vide */}
+          </div>
+          
+          {/* En-têtes des jours */}
+          {getVisibleDays().map(day => {
+            // Obtenir la date d'aujourd'hui
+            const today = new Date();
+            // Vérifier si le jour est aujourd'hui en comparant avec today au lieu de currentDate
+            const isToday = day === days[today.getDay() === 0 ? 6 : today.getDay() - 1];
+            
+            return (
               <div
-                key={time}
-                className={`p-1.5 sm:p-2 border-b border-r flex items-center text-[10px] sm:text-xs lg:text-sm ${
-                  isDarkMode ? 'border-gray-700 text-gray-200' : 'border-gray-200'
+                key={day}
+                className={`p-1.5 sm:p-2 lg:p-4 text-center font-medium border-r text-xs sm:text-sm lg:text-base flex flex-col items-center ${
+                  isDarkMode 
+                    ? 'text-gray-100 border-gray-700' 
+                    : 'text-gray-800 border-gray-200'
+                } ${
+                  isToday  // Utiliser isToday au lieu de isCurrentDay
+                    ? isDarkMode
+                      ? 'bg-blue-800/40'
+                      : 'bg-blue-100'
+                    : ''
                 }`}
               >
-                {time}
+                <span>{day.substring(0, 3)}</span>
+                <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  {currentDate.getDate()}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Grille scrollable */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `80px repeat(${getVisibleDays().length}, 1fr)`,
+            }}
+            className="h-full"
+          >
+            {/* Colonne des heures */}
+            <div className="border-r">
+              {timeSlots.map((time) => (
+                <div
+                  key={time}
+                  className={`p-1.5 sm:p-2 lg:p-4 text-xs sm:text-sm border-b ${
+                    isDarkMode
+                      ? 'border-gray-700 text-gray-300'
+                      : 'border-gray-200 text-gray-600'
+                  }`}
+                >
+                  {time}
+                </div>
+              ))}
+            </div>
+
+            {/* Colonnes des jours */}
+            {getVisibleDays().map((day) => (
+              <div key={day} className="border-r">
+                {timeSlots.map((time) => {
+                  const isAvailable = availabilities.some(
+                    slot => slot.day === day && slot.time === time
+                  );
+                  const isUnsaved = unsavedAvailabilities.some(
+                    slot => slot.day === day && slot.time === time
+                  );
+
+                  return (
+                    <motion.div
+                      key={`${day}-${time}`}
+                      className={`
+                        p-1.5 sm:p-2 lg:p-4 border-b cursor-pointer
+                        ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}
+                        ${isAvailable && mode === 'view' ?
+                          (isDarkMode ? 'bg-green-800/40' : 'bg-green-100') :
+                          ''}
+                        ${isUnsaved && mode === 'delete' ?
+                          (isDarkMode ? 'bg-red-800/40' : 'bg-red-100') :
+                          ''}
+                        hover:bg-opacity-80
+                      `}
+                      onClick={() => handleSlotClick(day, time)}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    />
+                  );
+                })}
               </div>
             ))}
           </div>
-
-          {/* Colonnes des jours */}
-          {getVisibleDays().map(day => (
-            <div key={day} className="grid auto-rows-fr">
-              {timeSlots.map(time => {
-                const isAvailable = isSlotAvailable(day, time);
-                const isSelected = isSlotSelected(day, time);
-                const course = getCourseForSlot(day, time);
-                const isUnsaved = unsavedAvailabilities.some(
-                  slot => slot.day === day && slot.time === time
-                );
-
-                return (
-                  <motion.div
-                    key={`${day}-${time}`}
-                    className={`
-                      p-1.5 sm:p-2 border-b border-r cursor-pointer transition-colors flex items-center
-                      ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}
-                      ${isAvailable && !isUnsaved ? 
-                        (isDarkMode ? 'bg-green-900/30' : 'bg-green-100') : 
-                        (isDarkMode ? '' : '')}
-                      ${isSelected ? 
-                        (isDarkMode ? 'bg-indigo-900/30' : 'bg-indigo-100') :
-                        ''}
-                      ${course ? 
-                        (isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100') :
-                        ''}
-                      ${isUnsaved && mode === 'delete' ? 
-                        (isDarkMode ? 'bg-red-900/30' : 'bg-red-100') :
-                        ''}
-                      hover:bg-opacity-80
-                    `}
-                    onClick={() => handleSlotClick(day, time)}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  />
-                );
-              })}
-            </div>
-          ))}
         </div>
       </div>
-    </>
-  );
+    );
+  };
 
   const isSlotAvailable = (day, time) => {
     return availabilities.some(slot => slot.day === day && slot.time === time);
@@ -378,19 +458,63 @@ const Calendar = ({ isDarkMode }) => {
     }
   };
 
+  const navigatePeriod = (direction) => {
+    const newDate = new Date(currentDate);
+    
+    switch (viewMode) {
+      case 'day':
+        newDate.setDate(newDate.getDate() + direction);
+        break;
+      case '3days':
+        newDate.setDate(newDate.getDate() + (direction * 3));
+        break;
+      case 'week':
+        newDate.setDate(newDate.getDate() + (direction * 7));
+        break;
+      case 'month':
+        newDate.setMonth(newDate.getMonth() + direction);
+        break;
+    }
+    
+    setCurrentDate(newDate);
+  };
+
+  const formatPeriodLabel = () => {
+    const options = { month: 'long', year: 'numeric' };
+    switch (viewMode) {
+      case 'day':
+        return `${days[currentDate.getDay() === 0 ? 6 : currentDate.getDay() - 1]} ${currentDate.getDate()} ${months[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+      case '3days':
+        const endDate = new Date(currentDate);
+        endDate.setDate(endDate.getDate() + 2);
+        return `${currentDate.getDate()} - ${endDate.getDate()} ${months[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+      case 'week':
+        const weekStart = new Date(currentDate);
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        return `${weekStart.getDate()} - ${weekEnd.getDate()} ${months[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+      case 'month':
+        return currentDate.toLocaleDateString('fr-FR', options);
+      default:
+        return '';
+    }
+  };
+
   return (
     <div className="w-full h-[calc(100vh-6rem)] p-2 sm:p-4 mb-8">
       <div className={`flex flex-col lg:flex-row rounded-2xl shadow-lg overflow-hidden h-full ${
         isDarkMode 
-          ? 'bg-gray-900 border border-gray-700' 
+          ? 'bg-gray-800 border border-gray-700' 
           : 'bg-white'
       }`}>
+        
         {/* Bouton toggle sidebar */}
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           className={`absolute top-8 left-4 z-20 p-2 rounded-lg transition-colors ${
             isDarkMode
-              ? 'text-gray-300 hover:bg-gray-800'
+              ? 'text-gray-300 hover:bg-gray-700'
               : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
@@ -413,10 +537,8 @@ const Calendar = ({ isDarkMode }) => {
               animate={{ width: "auto", opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className={`lg:flex flex-col border-b lg:border-b-0 lg:border-r ${
-                isDarkMode 
-                  ? 'bg-gray-900 border-gray-700' 
-                  : 'bg-gray-50 border-gray-200'
+              className={`lg:w-52 p-4 border-r ${
+                isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200'
               }`}
             >
               {/* Contenu de la sidebar */}
@@ -503,24 +625,6 @@ const Calendar = ({ isDarkMode }) => {
                   </div>
                 </div>
 
-                {(selectedSlots.length > 0 || unsavedAvailabilities.length > 0) && (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={saveAvailabilities}
-                    disabled={saveStatus === 'saving'}
-                    className={`
-                      w-full px-4 py-2 rounded-lg text-base font-medium transition-all
-                      ${isDarkMode
-                        ? 'bg-emerald-600 text-white hover:bg-emerald-500'
-                        : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                      }
-                    `}
-                  >
-                    {saveStatus === 'saving' ? 'Sauvegarde...' : 'Sauvegarder'}
-                  </motion.button>
-                )}
-
                 {/* Légende */}
                 <div className="hidden lg:block space-y-2 sm:space-y-3">
                   <h3 className={`text-xs sm:text-sm font-medium ${
@@ -530,10 +634,10 @@ const Calendar = ({ isDarkMode }) => {
                   </h3>
                   <div className="space-y-1.5 sm:space-y-2">
                     {[
-                      { label: 'Disponible', color: isDarkMode ? 'bg-green-900/30' : 'bg-green-100' },
-                      { label: 'Cours programmé', color: isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100' },
-                      { label: 'Sélectionné', color: isDarkMode ? 'bg-indigo-900/30' : 'bg-indigo-100' },
-                      { label: 'À supprimer', color: isDarkMode ? 'bg-red-900/30' : 'bg-red-100' }
+                      { label: 'Disponible', color: isDarkMode ? 'bg-green-800/40' : 'bg-green-100' },
+                      { label: 'Cours programmé', color: isDarkMode ? 'bg-blue-800/40' : 'bg-blue-100' },
+                      { label: 'Sélectionné', color: isDarkMode ? 'bg-indigo-800/40' : 'bg-indigo-100' },
+                      { label: 'À supprimer', color: isDarkMode ? 'bg-red-800/40' : 'bg-red-100' }
                     ].map(item => (
                       <div key={item.label} className="flex items-center space-x-2">
                         <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded ${item.color}`} />
@@ -549,11 +653,60 @@ const Calendar = ({ isDarkMode }) => {
           )}
         </AnimatePresence>
 
-        {/* Grille du calendrier */}
+        {/* Contenu principal */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-          {viewMode === 'month' ? renderMonthView() : renderWeekView()}
+          {/* Barre de navigation */}
+          <div className={`flex items-center justify-between p-4 border-b ${
+            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+          }`}>
+            <div className="flex items-center space-x-4">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigatePeriod(-1)}
+                className={`p-2 rounded-lg ${
+                  isDarkMode 
+                    ? 'hover:bg-gray-700 text-gray-300' 
+                    : 'hover:bg-gray-100 text-gray-600'
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </motion.button>
+              
+              <h2 className={`text-lg font-semibold ${
+                isDarkMode ? 'text-gray-100' : 'text-gray-800'
+              }`}>
+                {formatPeriodLabel()}
+              </h2>
+              
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigatePeriod(1)}
+                className={`p-2 rounded-lg ${
+                  isDarkMode 
+                    ? 'hover:bg-gray-700 text-gray-300' 
+                    : 'hover:bg-gray-100 text-gray-600'
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </motion.button>
+            </div>
+          </div>
+
+          {/* Conteneur du calendrier avec hauteur fixe et scroll */}
+          <div className="flex-1 overflow-hidden">
+            <div className="h-[calc(100vh-16rem)] overflow-y-auto">
+              {viewMode === 'month' ? renderMonthView() : renderWeekView()}
+            </div>
+          </div>
         </div>
 
+        {/* Bouton de sauvegarde flottant */}
         {(selectedSlots.length > 0 || unsavedAvailabilities.length > 0) && (
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -561,7 +714,7 @@ const Calendar = ({ isDarkMode }) => {
             onClick={saveAvailabilities}
             disabled={saveStatus === 'saving'}
             className={`
-              w-full px-4 py-2 rounded-lg text-base font-medium transition-all
+              fixed bottom-4 right-4 px-6 py-3 rounded-lg text-base font-medium shadow-lg transition-all
               ${isDarkMode
                 ? 'bg-emerald-600 text-white hover:bg-emerald-500'
                 : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
@@ -572,11 +725,12 @@ const Calendar = ({ isDarkMode }) => {
           </motion.button>
         )}
 
+        {/* Notification de sauvegarde */}
         {saveStatus && (
-          <div className={`mt-4 p-3 rounded ${
+          <div className={`fixed bottom-20 right-4 p-4 rounded-lg shadow-lg ${
             saveStatus.includes('succès') ? 
-              (isDarkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700') : 
-              (isDarkMode ? 'bg-red-900/30 text-red-300' : 'bg-red-100 text-red-700')
+              (isDarkMode ? 'bg-green-800/90 text-green-300' : 'bg-green-100 text-green-700') : 
+              (isDarkMode ? 'bg-red-800/90 text-red-300' : 'bg-red-100 text-red-700')
           }`}>
             {saveStatus}
           </div>

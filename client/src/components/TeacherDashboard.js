@@ -112,7 +112,7 @@ const TeacherDashboard = () => {
             isDarkMode
               ? 'bg-[#1e293b] text-blue-400 hover:bg-[#2d3a4f]'
               : 'bg-white text-gray-600 hover:bg-gray-50'
-          } ${isSidebarOpen ? 'left-[300px]' : 'left-0'}`}
+          } ${isSidebarOpen ? 'left-[280px]' : 'left-0'}`}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -134,7 +134,7 @@ const TeacherDashboard = () => {
           {isSidebarOpen && (
             <motion.div
               initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 320, opacity: 1 }}
+              animate={{ width: 280, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.3 }}
               className={`fixed left-0 top-16 h-[calc(100vh-4rem)] ${
@@ -173,7 +173,7 @@ const TeacherDashboard = () => {
 
         {/* Main Content */}
         <motion.main
-          animate={{ marginLeft: isSidebarOpen ? "320px" : "0px" }}
+          animate={{ marginLeft: isSidebarOpen ? "280px" : "0px" }}
           transition={{ duration: 0.3 }}
           className="flex-1 p-6"
         >
