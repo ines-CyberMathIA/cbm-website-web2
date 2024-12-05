@@ -11,7 +11,6 @@ const Calendar = ({ isDarkMode }) => {
   const [error, setError] = useState(null);
   const [selectedSlots, setSelectedSlots] = useState([]);
   const [saveStatus, setSaveStatus] = useState('');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState('week');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [mode, setMode] = useState('view');
@@ -549,118 +548,87 @@ const Calendar = ({ isDarkMode }) => {
 
   return (
     <div className="w-full h-[calc(100vh-6rem)] p-2 sm:p-4 mb-8">
-      <div className={`flex flex-col lg:flex-row rounded-2xl shadow-lg overflow-hidden h-full ${
+      <div className={`flex rounded-2xl shadow-lg overflow-hidden h-full ${
         isDarkMode 
           ? 'bg-gray-800 border border-gray-700' 
           : 'bg-white'
       }`}>
-        
-        {/* Bouton toggle sidebar */}
-        <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className={`absolute top-8 left-4 z-20 p-2 rounded-lg transition-colors ${
-            isDarkMode
-              ? 'text-gray-300 hover:bg-gray-700'
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          {isSidebarOpen ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-            </svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-            </svg>
-          )}
-        </button>
+        {/* Sidebar toujours visible (retirer l'AnimatePresence et la condition) */}
+        <div className={`w-52 p-4 border-r ${
+          isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200'
+        }`}>
+          {/* Contenu de la sidebar */}
+          <div className="p-3 sm:p-4 lg:p-6 flex flex-col space-y-3 sm:space-y-4 lg:space-y-6">
+            {/* Titre Planning */}
+            <div className="text-center lg:text-left">
+              <h2 className={`text-lg sm:text-xl font-semibold ${
+                isDarkMode ? 'text-gray-200' : 'text-gray-800'
+              }`}>
+                Planning
+              </h2>
+            </div>
 
-        {/* Sidebar avec animation */}
-        <AnimatePresence initial={false}>
-          {isSidebarOpen && (
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: "auto", opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className={`lg:w-52 p-4 border-r ${
-                isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200'
-              }`}
-            >
-              {/* Contenu de la sidebar */}
-              <div className="p-3 sm:p-4 lg:p-6 flex flex-col space-y-3 sm:space-y-4 lg:space-y-6">
-                {/* Titre Planning */}
-                <div className="text-center lg:text-left">
-                  <h2 className={`text-lg sm:text-xl font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                  }`}>
-                    Planning
-                  </h2>
-                </div>
-
-                {/* Boutons d'action */}
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <div className={`h-px flex-1 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
-                    <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Action</span>
-                    <div className={`h-px flex-1 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
-                  </div>
-                  <div className="flex flex-row lg:flex-col space-x-2 lg:space-x-0 lg:space-y-2">
-                    {sidebarButtons.map(({ mode: buttonMode, label, icon }) => (
-                      <motion.button
-                        key={buttonMode}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => {
-                          setMode(buttonMode);
-                          setSelectedSlots([]);
-                          setUnsavedAvailabilities([]);
-                        }}
-                        className={`
-                          flex-1 lg:flex-none px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all
-                          ${mode === buttonMode  // Comparer mode (état) avec buttonMode (prop du bouton)
-                            ? isDarkMode
-                              ? 'bg-indigo-600 text-white'
-                              : 'bg-indigo-100 text-indigo-700'
-                            : isDarkMode
-                              ? 'text-gray-300 hover:bg-gray-700'
-                              : 'text-gray-600 hover:bg-gray-100'
-                          }
-                        `}
-                      >
-                        {label}
-                      </motion.button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Légende */}
-                <div className="hidden lg:block space-y-2 sm:space-y-3">
-                  <h3 className={`text-xs sm:text-sm font-medium ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                  }`}>
-                    Légende
-                  </h3>
-                  <div className="space-y-1.5 sm:space-y-2">
-                    {[
-                      { label: 'Disponible', color: isDarkMode ? 'bg-green-800/40' : 'bg-green-100' },
-                      { label: 'Cours programmé', color: isDarkMode ? 'bg-blue-800/40' : 'bg-blue-100' },
-                      { label: 'Sélectionné', color: isDarkMode ? 'bg-indigo-800/40' : 'bg-indigo-100' },
-                      { label: 'À supprimer', color: isDarkMode ? 'bg-red-800/40' : 'bg-red-100' }
-                    ].map(item => (
-                      <div key={item.label} className="flex items-center space-x-2">
-                        <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded ${item.color}`} />
-                        <span className={`text-xs sm:text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                          {item.label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            {/* Boutons d'action */}
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <div className={`h-px flex-1 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
+                <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Action</span>
+                <div className={`h-px flex-1 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <div className="flex flex-row lg:flex-col space-x-2 lg:space-x-0 lg:space-y-2">
+                {sidebarButtons.map(({ mode: buttonMode, label, icon }) => (
+                  <motion.button
+                    key={buttonMode}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      setMode(buttonMode);
+                      setSelectedSlots([]);
+                      setUnsavedAvailabilities([]);
+                    }}
+                    className={`
+                      flex-1 lg:flex-none px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all
+                      ${mode === buttonMode  // Comparer mode (état) avec buttonMode (prop du bouton)
+                        ? isDarkMode
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-indigo-100 text-indigo-700'
+                        : isDarkMode
+                          ? 'text-gray-300 hover:bg-gray-700'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }
+                    `}
+                  >
+                    {label}
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+
+            {/* Légende */}
+            <div className="hidden lg:block space-y-2 sm:space-y-3">
+              <h3 className={`text-xs sm:text-sm font-medium ${
+                isDarkMode ? 'text-gray-300' : 'text-gray-600'
+              }`}>
+                Légende
+              </h3>
+              <div className="space-y-1.5 sm:space-y-2">
+                {[
+                  { label: 'Disponible', color: isDarkMode ? 'bg-green-800/40' : 'bg-green-100' },
+                  { label: 'Cours programmé', color: isDarkMode ? 'bg-blue-800/40' : 'bg-blue-100' },
+                  { label: 'Sélectionné', color: isDarkMode ? 'bg-indigo-800/40' : 'bg-indigo-100' },
+                  { label: 'À supprimer', color: isDarkMode ? 'bg-red-800/40' : 'bg-red-100' }
+                ].map(item => (
+                  <div key={item.label} className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded ${item.color}`} />
+                    <span className={`text-xs sm:text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                      {item.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Contenu principal */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">

@@ -11,7 +11,7 @@ const TeacherDashboard = () => {
   const navigate = useNavigate();
   const user = JSON.parse(sessionStorage.getItem('user'));
   const [activeSection, setActiveSection] = useState('calendar');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedMode = localStorage.getItem('darkMode');
     return savedMode ? JSON.parse(savedMode) : false;
@@ -48,138 +48,161 @@ const TeacherDashboard = () => {
   };
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-[#0f172a]' : 'bg-gray-50'} transition-colors duration-300`}>
-      {/* Navbar */}
-      <nav className={`${
-        isDarkMode 
-          ? 'bg-[#1e293b] border-b border-blue-900/30 shadow-lg shadow-blue-500/10' 
-          : 'bg-white/80 backdrop-blur-sm border-b border-gray-200 shadow-lg'
-      } sticky top-0 z-50 transition-all duration-300`}>
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+      {/* Header avec bouton menu */}
+      <header className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 flex items-center">
-                <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-teal-400 bg-clip-text text-transparent">
+          <div className="flex items-center justify-between h-16">
+            {/* Partie gauche */}
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setIsMenuOpen(true)}
+                className={`p-2 rounded-lg ${
+                  isDarkMode 
+                    ? 'hover:bg-gray-700 text-gray-200' 
+                    : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              
+              {/* Logo avec gradient */}
+              <div className="flex items-center flex-shrink-0">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
                   CyberMathIA
-                </span>
+                </h1>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+
+            {/* Partie droite */}
+            <div className="flex items-center space-x-6">
+              {/* Nom du professeur */}
+              <span className={`font-medium ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                {user?.firstName} {user?.lastName}
+              </span>
+
+              {/* Toggle Dark Mode */}
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
                 className={`p-2 rounded-lg ${
-                  isDarkMode
-                    ? 'bg-blue-900/30 text-blue-400 hover:bg-blue-800/40'
-                    : 'bg-blue-50 text-blue-500 hover:bg-blue-100'
-                } transition-colors duration-200`}
+                  isDarkMode 
+                    ? 'hover:bg-gray-700 text-gray-200' 
+                    : 'hover:bg-gray-100 text-gray-700'
+                }`}
+                aria-label="Toggle dark mode"
               >
                 {isDarkMode ? (
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                   </svg>
                 ) : (
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                   </svg>
                 )}
               </button>
-              <span className={`${isDarkMode ? 'text-blue-100' : 'text-gray-700'} font-medium`}>
-                {user?.firstName} {user?.lastName}
-              </span>
+
+              {/* Bouton déconnexion */}
               <button
                 onClick={() => {
                   sessionStorage.clear();
                   navigate('/login');
                 }}
-                className={`px-4 py-2 rounded-lg ${
-                  isDarkMode
-                    ? 'bg-red-900/20 text-red-400 hover:bg-red-900/30'
-                    : 'bg-red-50 text-red-600 hover:bg-red-100'
-                } transition-colors duration-200`}
+                className={`p-2 rounded-lg ${
+                  isDarkMode 
+                    ? 'hover:bg-gray-700 text-gray-200' 
+                    : 'hover:bg-gray-100 text-gray-700'
+                }`}
+                aria-label="Se déconnecter"
               >
-                Déconnexion
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
               </button>
             </div>
           </div>
         </div>
-      </nav>
+      </header>
 
-      <div className="flex">
-        {/* Toggle Button - Now outside the sidebar */}
-        <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className={`fixed left-0 top-1/2 transform -translate-y-1/2 p-2 rounded-r-lg shadow-lg z-50 transition-all duration-300 ${
-            isDarkMode
-              ? 'bg-[#1e293b] text-blue-400 hover:bg-[#2d3a4f]'
-              : 'bg-white text-gray-600 hover:bg-gray-50'
-          } ${isSidebarOpen ? 'left-[280px]' : 'left-0'}`}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d={isSidebarOpen ? "M15 19l-7-7 7-7" : "M9 5l7 7-7 7"}
-            />
-          </svg>
-        </button>
-
-        <AnimatePresence initial={false}>
-          {isSidebarOpen && (
+      {/* Menu modal */}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <>
+            {/* Overlay avec flou */}
             <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 280, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className={`fixed left-0 top-16 h-[calc(100vh-4rem)] ${
-                isDarkMode
-                  ? 'bg-[#1e293b] border-r border-blue-900/30'
-                  : 'bg-white border-r border-gray-200'
-              } overflow-hidden transition-colors duration-300`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className={`fixed inset-0 backdrop-blur-md z-40 ${
+                isDarkMode ? 'bg-black/30' : 'bg-black/10'
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            />
+
+            {/* Menu */}
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
             >
-              <div className="flex flex-col h-full py-6 space-y-8">
+              <div className="relative flex flex-col items-center space-y-4 pointer-events-auto">
                 {menuItems.map((item) => (
                   <motion.button
                     key={item.id}
-                    onClick={() => setActiveSection(item.id)}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`w-full flex items-center space-x-4 p-4 text-lg font-medium rounded-xl transition-all ${
-                      activeSection === item.id
-                        ? isDarkMode
-                          ? 'bg-blue-900/30 text-blue-400'
-                          : 'bg-blue-50 text-blue-600'
-                        : isDarkMode
-                          ? 'text-gray-300 hover:bg-blue-900/20'
-                          : 'text-gray-600 hover:bg-gray-50'
-                    }`}
+                    onClick={() => {
+                      setActiveSection(item.id);
+                      setIsMenuOpen(false);
+                    }}
+                    className="relative group"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-                    </svg>
-                    <span>{item.label}</span>
+                    {/* Effet de lumière adapté au mode */}
+                    <div className={`
+                      absolute inset-0 rounded-lg blur-xl 
+                      group-hover:opacity-100 opacity-0 
+                      transition-opacity duration-300
+                      ${isDarkMode 
+                        ? 'bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-pink-500/30'
+                        : 'bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20'
+                      }
+                    `} />
+                    
+                    {/* Contenu du bouton */}
+                    <div className={`
+                      relative flex items-center space-x-4 px-8 py-4 rounded-lg
+                      ${activeSection === item.id
+                        ? isDarkMode 
+                          ? 'text-white bg-white/20'
+                          : 'text-gray-900 bg-black/10'
+                        : isDarkMode
+                          ? 'text-white/90 hover:text-white'
+                          : 'text-gray-700 hover:text-gray-900'
+                      }
+                      transition-all duration-300
+                    `}>
+                      <svg className={`w-6 h-6 ${isDarkMode ? 'text-white' : 'text-gray-700'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+                      </svg>
+                      <span className={`text-lg font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {item.label}
+                      </span>
+                    </div>
                   </motion.button>
                 ))}
               </div>
             </motion.div>
-          )}
-        </AnimatePresence>
+          </>
+        )}
+      </AnimatePresence>
 
-        {/* Main Content */}
-        <motion.main
-          animate={{ marginLeft: isSidebarOpen ? "280px" : "0px" }}
-          transition={{ duration: 0.3 }}
-          className="flex-1 p-6"
-        >
-          {renderContent()}
-        </motion.main>
-      </div>
+      {/* Contenu principal */}
+      <main className={`p-4 ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        {renderContent()}
+      </main>
     </div>
   );
 };
