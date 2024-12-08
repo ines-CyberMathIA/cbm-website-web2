@@ -148,4 +148,50 @@ router.put('/messages/:managerId/read', authMiddleware, async (req, res) => {
   }
 });
 
+// Ajouter de nouvelles disponibilités
+router.post('/availabilities/add', authMiddleware, async (req, res) => {
+  try {
+    const { newAvailabilities } = req.body;
+    const teacherId = req.user.userId;
+
+    // Ajouter les nouvelles disponibilités à la base de données
+    const availabilitiesToAdd = newAvailabilities.map(availability => ({
+      teacherId,
+      day: availability.day,
+      startTime: availability.startTime,
+      endTime: availability.endTime
+    }));
+
+    await TeacherAvailability.insertMany(availabilitiesToAdd);
+
+    res.status(200).json({ message: 'Disponibilités ajoutées avec succès' });
+  } catch (error) {
+    console.error('Erreur lors de l\'ajout des disponibilités:', error);
+    res.status(500).json({ error: 'Erreur lors de l\'ajout des disponibilités' });
+  }
+});
+
+// Supprimer des disponibilités spécifiques
+router.post('/availabilities/delete', authMiddleware, async (req, res) => {
+  try {
+    const { availabilitiesToDelete } = req.body;
+    const teacherId = req.user.userId;
+
+    // Supprimer les disponibilités spécifiées
+    for (const availability of availabilitiesToDelete) {
+      await TeacherAvailability.deleteMany({
+        teacherId,
+        day: availability.day,
+        startTime: availability.startTime,
+        endTime: availability.endTime
+      });
+    }
+
+    res.status(200).json({ message: 'Disponibilités supprimées avec succès' });
+  } catch (error) {
+    console.error('Erreur lors de la suppression des disponibilités:', error);
+    res.status(500).json({ error: 'Erreur lors de la suppression des disponibilités' });
+  }
+});
+
 export default router; 

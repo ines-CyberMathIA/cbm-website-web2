@@ -16,6 +16,11 @@ const Calendar = ({ isDarkMode }) => {
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [selectionType, setSelectionType] = useState('single');
 
+  useEffect(() => {
+    console.log('Mode actuel:', mode);
+    console.log('Type de sélection actuel:', selectionType);
+  }, [mode, selectionType]);
+
   const isSlotAvailable = (day, time) => {
     return availabilities.some(slot => {
       if (!slot.startTime || !slot.endTime) return false;
@@ -418,27 +423,11 @@ const Calendar = ({ isDarkMode }) => {
 
         // Si le créneau est déjà sélectionné, on le retire
         if (isAlreadySelected) {
-          if (selectionType === 'weekly') {
-            // En mode hebdomadaire, retirer le créneau pour tous les jours
-            return prev.filter(slot => slot.time !== time);
-          } else {
-            // En mode normal, retirer seulement le créneau sélectionné
-            return prev.filter(slot => !(slot.day === day && slot.time === time));
-          }
+          return prev.filter(slot => !(slot.day === day && slot.time === time));
         }
 
-        // Si le créneau n'est pas sélectionné, on l'ajoute
-        if (selectionType === 'weekly') {
-          // En mode hebdomadaire, ajouter le créneau pour tous les jours
-          const newSlots = [...prev];
-          days.forEach(d => {
-            newSlots.push({ day: d, time });
-          });
-          return newSlots;
-        } else {
-          // En mode normal, ajouter seulement le créneau sélectionné
-          return [...prev, { day, time }];
-        }
+        // En mode hebdomadaire ou normal, on ajoute simplement le créneau sélectionné
+        return [...prev, { day, time }];
       });
     } else if (mode === 'delete') {
       if (isSlotAvailable(day, time)) {
@@ -508,8 +497,25 @@ const Calendar = ({ isDarkMode }) => {
   };
 
   const validateTimeSlots = (slots) => {
+    // Combiner les créneaux sélectionnés avec les disponibilités existantes
+    const allSlots = [...slots];
+    
+    // Ajouter les créneaux des disponibilités existantes
+    availabilities.forEach(slot => {
+      if (slot.startTime && slot.endTime) {
+        let currentTime = slot.startTime;
+        while (currentTime < slot.endTime) {
+          allSlots.push({
+            day: slot.day,
+            time: currentTime
+          });
+          currentTime = addMinutes(currentTime, 30);
+        }
+      }
+    });
+
     // Trier les créneaux par jour et heure
-    const sortedSlots = [...slots].sort((a, b) => {
+    const sortedSlots = [...allSlots].sort((a, b) => {
       if (a.day !== b.day) return days.indexOf(a.day) - days.indexOf(b.day);
       return a.time.localeCompare(b.time);
     });
@@ -517,13 +523,13 @@ const Calendar = ({ isDarkMode }) => {
     // Regrouper par jour
     const slotsByDay = {};
     sortedSlots.forEach(slot => {
-      if (!slotsByDay[slot.day]) slotsByDay[slot.day] = [];
-      slotsByDay[slot.day].push(slot.time);
+      if (!slotsByDay[slot.day]) slotsByDay[slot.day] = new Set();
+      slotsByDay[slot.day].add(slot.time);
     });
 
     // Vérifier chaque jour
     for (const day in slotsByDay) {
-      const times = slotsByDay[day].sort();
+      const times = Array.from(slotsByDay[day]).sort();
       let currentGroup = [];
 
       // Parcourir tous les créneaux du jour
@@ -586,17 +592,12 @@ const Calendar = ({ isDarkMode }) => {
         }
 
         // Convertir uniquement les nouveaux créneaux sélectionnés
-        const ranges = convertSlotsToRanges(selectedSlots);
+        const newRanges = convertSlotsToRanges(selectedSlots);
         
-        console.log('Données envoyées au serveur:', {
-          availabilities: ranges,
-          token: token
-        });
-        
-        // Sauvegarder les nouvelles disponibilités
+        // Envoyer une requête POST pour ajouter les nouvelles disponibilités
         const saveResponse = await axios.post(
-          `${config.API_URL}/api/teacher/availabilities`,
-          { availabilities: ranges },
+          `${config.API_URL}/api/teacher/availabilities/add`,  // Notez le changement d'URL
+          { newAvailabilities: newRanges },  // Renommé pour plus de clarté
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -624,12 +625,42 @@ const Calendar = ({ isDarkMode }) => {
           setMode('view');
           setSelectionType('single');
 
-          console.log('Disponibilités mises à jour:', getResponse.data);
-
           setTimeout(() => {
             setSaveStatus('');
             setError(null);
           }, 2000);
+        }
+      } else if (mode === 'delete' && unsavedAvailabilities.length > 0) {
+        // Ajouter la logique de suppression ici si nécessaire
+        const slotsToDelete = convertSlotsToRanges(unsavedAvailabilities);
+        
+        const deleteResponse = await axios.post(
+          `${config.API_URL}/api/teacher/availabilities/delete`,
+          { availabilitiesToDelete: slotsToDelete },
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (deleteResponse.data) {
+          // Recharger les disponibilités après la suppression
+          const getResponse = await axios.get(
+            `${config.API_URL}/api/teacher/availabilities`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+          setAvailabilities(getResponse.data);
+          setUnsavedAvailabilities([]);
+          setSaveStatus('saved');
+          setMode('view');
         }
       }
     } catch (error) {
@@ -708,7 +739,7 @@ const Calendar = ({ isDarkMode }) => {
       icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z',
       onClick: () => {
         setMode('view');
-        setSelectionType('single');
+        setSelectionType(null);
         setSelectedSlots([]);
         setIsAddMenuOpen(false);
       }
@@ -719,9 +750,9 @@ const Calendar = ({ isDarkMode }) => {
       icon: 'M12 6v6m0 0v6m0-6h6m-6 0H6',
       onClick: () => {
         setIsAddMenuOpen(!isAddMenuOpen);
-        if (!isAddMenuOpen) {
-          setMode('add');
-          setSelectionType('single');
+        if (isAddMenuOpen) {
+          setMode('view');
+          setSelectionType(null);
           setSelectedSlots([]);
         }
       }
@@ -739,9 +770,8 @@ const Calendar = ({ isDarkMode }) => {
     }
   ];
 
-  // Ajouter cette fonction pour rendre les boutons de la sidebar selon le mode
+  // Rendu des boutons de la sidebar
   const renderSidebarButtons = () => {
-    // Modifier les styles des boutons dans renderSidebarButtons
     const buttonBaseStyle = `
       w-full px-4 py-3 rounded-lg font-medium
       relative overflow-hidden
@@ -753,43 +783,7 @@ const Calendar = ({ isDarkMode }) => {
       shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]
     `;
 
-    // Style pour les boutons d'action (Sauvegarder/Confirmer)
-    const actionButtonStyle = `
-      ${buttonBaseStyle}
-      ${isDarkMode
-        ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-400/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
-        : 'bg-emerald-50 hover:bg-emerald-100/80 text-emerald-700 border-emerald-200'
-      }
-    `;
-
-    // Style pour les boutons d'annulation
-    const cancelButtonStyle = `
-      ${buttonBaseStyle}
-      ${isDarkMode
-        ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-400/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]'
-        : 'bg-rose-50 hover:bg-rose-100/80 text-rose-700 border-rose-200'
-      }
-    `;
-
-    // Style pour les boutons normaux
-    const normalButtonStyle = `
-      ${buttonBaseStyle}
-      ${isDarkMode
-        ? 'bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 border-gray-500/30'
-        : 'bg-white/80 hover:bg-gray-50/80 text-gray-700 border-gray-200'
-      }
-    `;
-
-    // Style pour le bouton actif
-    const activeButtonStyle = `
-      ${buttonBaseStyle}
-      ${isDarkMode
-        ? 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border-indigo-400/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]'
-        : 'bg-indigo-50 hover:bg-indigo-100/80 text-indigo-700 border-indigo-200'
-      }
-    `;
-
-    // Mode de sélection (add avec un type de sélection)
+    // Si on est en mode ajout avec un type de sélection, afficher les boutons de sauvegarde/annulation
     if (mode === 'add' && selectionType) {
       return (
         <div className="flex flex-col space-y-3">
@@ -797,7 +791,13 @@ const Calendar = ({ isDarkMode }) => {
             whileHover={{ scale: 1.02, translateY: -2 }}
             whileTap={{ scale: 0.98 }}
             onClick={saveAvailabilities}
-            className={actionButtonStyle}
+            className={`
+              ${buttonBaseStyle}
+              ${isDarkMode
+                ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-400/50'
+                : 'bg-emerald-50 hover:bg-emerald-100/80 text-emerald-700 border-emerald-200'
+              }
+            `}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -812,8 +812,15 @@ const Calendar = ({ isDarkMode }) => {
               setMode('view');
               setSelectionType(null);
               setSelectedSlots([]);
+              setIsAddMenuOpen(false);
             }}
-            className={cancelButtonStyle}
+            className={`
+              ${buttonBaseStyle}
+              ${isDarkMode
+                ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-400/50'
+                : 'bg-rose-50 hover:bg-rose-100/80 text-rose-700 border-rose-200'
+              }
+            `}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -824,41 +831,7 @@ const Calendar = ({ isDarkMode }) => {
       );
     }
 
-    // Mode de suppression
-    if (mode === 'delete') {
-      return (
-        <div className="flex flex-col space-y-3">
-          <motion.button
-            whileHover={{ scale: 1.02, translateY: -2 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={saveAvailabilities}
-            className={actionButtonStyle}
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            Confirmer
-          </motion.button>
-          
-          <motion.button
-            whileHover={{ scale: 1.02, translateY: -2 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => {
-              setMode('view');
-              setUnsavedAvailabilities([]);
-            }}
-            className={cancelButtonStyle}
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Annuler
-          </motion.button>
-        </div>
-      );
-    }
-
-    // Mode vue normale
+    // Sinon, afficher les boutons normaux
     return (
       <div className="flex flex-col space-y-2">
         {sidebarButtons.map(({ mode: buttonMode, label, icon, onClick }) => (
@@ -866,16 +839,18 @@ const Calendar = ({ isDarkMode }) => {
             <motion.button
               whileHover={{ scale: 1.02, translateY: -2 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => {
-                if (onClick) {
-                  onClick();
-                } else {
-                  setMode(buttonMode);
-                  setSelectedSlots([]);
-                  setUnsavedAvailabilities([]);
+              onClick={onClick}
+              className={`
+                ${buttonBaseStyle}
+                ${mode === buttonMode
+                  ? isDarkMode
+                    ? 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border-indigo-400/50'
+                    : 'bg-indigo-50 hover:bg-indigo-100/80 text-indigo-700 border-indigo-200'
+                  : isDarkMode
+                    ? 'bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 border-gray-500/30'
+                    : 'bg-white/80 hover:bg-gray-50/80 text-gray-700 border-gray-200'
                 }
-              }}
-              className={mode === buttonMode ? activeButtonStyle : normalButtonStyle}
+              `}
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
@@ -884,7 +859,7 @@ const Calendar = ({ isDarkMode }) => {
             </motion.button>
 
             {/* Menu déroulant pour le bouton Ajouter */}
-            {buttonMode === 'add' && isAddMenuOpen && (
+            {buttonMode === 'add' && isAddMenuOpen && mode === 'view' && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
