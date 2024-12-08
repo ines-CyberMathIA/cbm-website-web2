@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import axios from 'axios';
 import config from '../../config';
 
 const Calendar = ({ isDarkMode }) => {
   const [availabilities, setAvailabilities] = useState([]);
   const [unsavedAvailabilities, setUnsavedAvailabilities] = useState([]);
-  const [courses, setCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedSlots, setSelectedSlots] = useState([]);
   const [saveStatus, setSaveStatus] = useState('');
@@ -15,9 +13,61 @@ const Calendar = ({ isDarkMode }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [mode, setMode] = useState('view');
   const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const [selectionType, setSelectionType] = useState('single');
+
+  const isSlotAvailable = (day, time) => {
+    return availabilities.some(slot => {
+      if (!slot.startTime || !slot.endTime) return false;
+      const slotStart = new Date(`2000-01-01T${slot.startTime}`);
+      const slotEnd = new Date(`2000-01-01T${slot.endTime}`);
+      const currentTime = new Date(`2000-01-01T${time}`);
+      return slot.day === day && 
+             currentTime >= slotStart && 
+             currentTime < slotEnd;
+    });
+  };
 
   const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
   const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+
+  // Définition des items du menu d'ajout
+  const addMenuItems = [
+    { 
+      id: 'weekly', 
+      label: 'Disponibilités hebdomadaires', 
+      icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+      onClick: () => {
+        setMode('add');
+        setSelectionType('weekly');
+        setSelectedSlots([]);
+        setIsAddMenuOpen(false);
+        setViewMode('week');
+      }
+    },
+    { 
+      id: 'meeting', 
+      label: 'Réunion avec manager', 
+      icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z',
+      onClick: () => {
+        setMode('add');
+        setSelectionType('single');
+        setSelectedSlots([]);
+        setIsAddMenuOpen(false);
+      }
+    },
+    { 
+      id: 'workshop', 
+      label: 'Disponibilités stage', 
+      icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10',
+      onClick: () => {
+        setMode('add');
+        setSelectionType('single');
+        setSelectedSlots([]);
+        setIsAddMenuOpen(false);
+      }
+    }
+  ];
 
   // Modification des horaires de 6h à 22h
   const timeSlots = Array.from({ length: 33 }, (_, i) => {
@@ -317,10 +367,11 @@ const Calendar = ({ isDarkMode }) => {
             {getVisibleDays().map((day) => (
               <div key={day} className="border-r">
                 {timeSlots.map((time) => {
-                  const isAvailable = availabilities.some(
+                  const isAvailable = isSlotAvailable(day, time);
+                  const isUnsaved = unsavedAvailabilities.some(
                     slot => slot.day === day && slot.time === time
                   );
-                  const isUnsaved = unsavedAvailabilities.some(
+                  const isSelected = selectedSlots.some(
                     slot => slot.day === day && slot.time === time
                   );
 
@@ -330,11 +381,14 @@ const Calendar = ({ isDarkMode }) => {
                       className={`
                         h-[40px] p-1.5 sm:p-2 lg:p-4 border-b cursor-pointer
                         ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}
-                        ${isAvailable && mode === 'view' ?
+                        ${isAvailable ?
                           (isDarkMode ? 'bg-green-800/40' : 'bg-green-100') :
                           ''}
                         ${isUnsaved && mode === 'delete' ?
                           (isDarkMode ? 'bg-red-800/40' : 'bg-red-100') :
+                          ''}
+                        ${isSelected && mode === 'add' ?
+                          (isDarkMode ? 'bg-indigo-800/40' : 'bg-indigo-100') :
                           ''}
                         hover:bg-opacity-80
                       `}
@@ -352,28 +406,39 @@ const Calendar = ({ isDarkMode }) => {
     );
   };
 
-  const isSlotAvailable = (day, time) => {
-    return availabilities.some(slot => slot.day === day && slot.time === time);
-  };
-
-  const isSlotSelected = (day, time) => {
-    return selectedSlots.some(slot => slot.day === day && slot.time === time);
-  };
-
-  const getCourseForSlot = (day, time) => {
-    return courses.find(course => course.day === day && course.time === time);
-  };
-
   const handleSlotClick = (day, time) => {
     if (mode === 'view') return;
 
     if (mode === 'add') {
       setSelectedSlots(prev => {
-        const isAlreadySelected = prev.some(slot => slot.day === day && slot.time === time);
+        // Vérifier si le créneau est déjà sélectionné
+        const isAlreadySelected = prev.some(slot => 
+          slot.day === day && slot.time === time
+        );
+
+        // Si le créneau est déjà sélectionné, on le retire
         if (isAlreadySelected) {
-          return prev.filter(slot => !(slot.day === day && slot.time === time));
+          if (selectionType === 'weekly') {
+            // En mode hebdomadaire, retirer le créneau pour tous les jours
+            return prev.filter(slot => slot.time !== time);
+          } else {
+            // En mode normal, retirer seulement le créneau sélectionné
+            return prev.filter(slot => !(slot.day === day && slot.time === time));
+          }
         }
-        return [...prev, { day, time }];
+
+        // Si le créneau n'est pas sélectionné, on l'ajoute
+        if (selectionType === 'weekly') {
+          // En mode hebdomadaire, ajouter le créneau pour tous les jours
+          const newSlots = [...prev];
+          days.forEach(d => {
+            newSlots.push({ day: d, time });
+          });
+          return newSlots;
+        } else {
+          // En mode normal, ajouter seulement le créneau sélectionné
+          return [...prev, { day, time }];
+        }
       });
     } else if (mode === 'delete') {
       if (isSlotAvailable(day, time)) {
@@ -399,45 +464,34 @@ const Calendar = ({ isDarkMode }) => {
     const ranges = [];
     const slotsByDay = {};
 
+    // Regrouper les créneaux par jour
     slots.forEach(slot => {
       if (!slotsByDay[slot.day]) {
-        slotsByDay[slot.day] = [];
+        slotsByDay[slot.day] = new Set();
       }
-      slotsByDay[slot.day].push(slot.time);
+      slotsByDay[slot.day].add(slot.time);
     });
 
-    Object.entries(slotsByDay).forEach(([day, times]) => {
-      times.sort();
-      
-      let startTime = null;
-      let lastTime = null;
+    // Pour chaque jour, convertir les créneaux en plages horaires
+    Object.entries(slotsByDay).forEach(([day, timesSet]) => {
+      const times = Array.from(timesSet).sort();
+      let currentRange = {
+        day,
+        startTime: null,
+        endTime: null
+      };
 
       times.forEach((time, index) => {
-        if (!startTime) {
-          startTime = time;
-          lastTime = time;
-        } else {
-          const lastDate = new Date(`2000-01-01T${lastTime}`);
-          const currentDate = new Date(`2000-01-01T${time}`);
-          const diffMinutes = (currentDate - lastDate) / (1000 * 60);
+        if (!currentRange.startTime) {
+          currentRange.startTime = time;
+        }
 
-          if (diffMinutes > 30) {
-            ranges.push({
-              day,
-              startTime,
-              endTime: addMinutes(lastTime, 30)
-            });
-            startTime = time;
-          }
-          lastTime = time;
-
-          if (index === times.length - 1) {
-            ranges.push({
-              day,
-              startTime,
-              endTime: addMinutes(time, 30)
-            });
-          }
+        // Si c'est le dernier créneau ou si le prochain créneau n'est pas consécutif
+        if (index === times.length - 1 || 
+            !isConsecutiveTime(time, times[index + 1])) {
+          currentRange.endTime = addMinutes(time, 30);
+          ranges.push({ ...currentRange });
+          currentRange.startTime = null;
         }
       });
     });
@@ -445,43 +499,159 @@ const Calendar = ({ isDarkMode }) => {
     return ranges;
   };
 
-  const saveAvailabilities = async () => {
-    try {
-      setSaveStatus('saving');
-      let newAvailabilities = [...availabilities];
+  const isConsecutiveTime = (time1, time2) => {
+    const [h1, m1] = time1.split(':').map(Number);
+    const [h2, m2] = time2.split(':').map(Number);
+    const minutes1 = h1 * 60 + m1;
+    const minutes2 = h2 * 60 + m2;
+    return minutes2 - minutes1 === 30;
+  };
 
-      if (mode === 'add' && selectedSlots.length > 0) {
-        newAvailabilities = [...availabilities, ...selectedSlots];
-      } else if (mode === 'delete' && unsavedAvailabilities.length > 0) {
-        newAvailabilities = availabilities.filter(slot => 
-          !unsavedAvailabilities.some(
-            unsaved => unsaved.day === slot.day && unsaved.time === slot.time
-          )
-        );
-      }
+  const validateTimeSlots = (slots) => {
+    // Trier les créneaux par jour et heure
+    const sortedSlots = [...slots].sort((a, b) => {
+      if (a.day !== b.day) return days.indexOf(a.day) - days.indexOf(b.day);
+      return a.time.localeCompare(b.time);
+    });
 
-      const ranges = convertSlotsToRanges(newAvailabilities);
-      
-      await axios.post(
-        `${config.API_URL}/api/teacher/availabilities`,
-        { availabilities: ranges },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`
+    // Regrouper par jour
+    const slotsByDay = {};
+    sortedSlots.forEach(slot => {
+      if (!slotsByDay[slot.day]) slotsByDay[slot.day] = [];
+      slotsByDay[slot.day].push(slot.time);
+    });
+
+    // Vérifier chaque jour
+    for (const day in slotsByDay) {
+      const times = slotsByDay[day].sort();
+      let currentGroup = [];
+
+      // Parcourir tous les créneaux du jour
+      for (let i = 0; i < times.length; i++) {
+        const currentTime = times[i];
+        
+        if (currentGroup.length === 0) {
+          currentGroup.push(currentTime);
+        } else {
+          const lastTime = currentGroup[currentGroup.length - 1];
+          
+          // Calculer la différence en minutes
+          const [lastHour, lastMin] = lastTime.split(':').map(Number);
+          const [currentHour, currentMin] = currentTime.split(':').map(Number);
+          const lastTotalMins = lastHour * 60 + lastMin;
+          const currentTotalMins = currentHour * 60 + currentMin;
+          
+          if (currentTotalMins - lastTotalMins === 30) {
+            // Les créneaux sont consécutifs
+            currentGroup.push(currentTime);
+          } else {
+            // Si le groupe précédent est trop petit, retourner false
+            if (currentGroup.length < 3) {
+              return false;
+            }
+            // Commencer un nouveau groupe
+            currentGroup = [currentTime];
           }
         }
-      );
+      }
 
-      setAvailabilities(newAvailabilities);
-      setSelectedSlots([]);
-      setUnsavedAvailabilities([]);
-      setSaveStatus('saved');
-      setMode('view');
+      // Vérifier le dernier groupe
+      if (currentGroup.length < 3) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const saveAvailabilities = async () => {
+    try {
+      const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+      const user = JSON.parse(sessionStorage.getItem('user'));
+
+      if (!token || !user) {
+        setError('Session expirée. Veuillez vous reconnecter.');
+        setSaveStatus('error');
+        return;
+      }
+
+      setSaveStatus('saving');
+      setError(null);
+
+      if (mode === 'add' && selectedSlots.length > 0) {
+        if (!validateTimeSlots(selectedSlots)) {
+          setError('Chaque plage horaire doit faire au minimum 1h30 (3 créneaux consécutifs)');
+          setSaveStatus('error');
+          return;
+        }
+
+        // Convertir uniquement les nouveaux créneaux sélectionnés
+        const ranges = convertSlotsToRanges(selectedSlots);
+        
+        console.log('Données envoyées au serveur:', {
+          availabilities: ranges,
+          token: token
+        });
+        
+        // Sauvegarder les nouvelles disponibilités
+        const saveResponse = await axios.post(
+          `${config.API_URL}/api/teacher/availabilities`,
+          { availabilities: ranges },
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (saveResponse.data) {
+          // Recharger les disponibilités depuis le serveur
+          const getResponse = await axios.get(
+            `${config.API_URL}/api/teacher/availabilities`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+          // Mettre à jour l'état avec les données fraîches du serveur
+          setAvailabilities(getResponse.data);
+          setSelectedSlots([]);
+          setSaveStatus('saved');
+          setMode('view');
+          setSelectionType('single');
+
+          console.log('Disponibilités mises à jour:', getResponse.data);
+
+          setTimeout(() => {
+            setSaveStatus('');
+            setError(null);
+          }, 2000);
+        }
+      }
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
-      setError(error.response?.data?.message || 'Erreur lors de la sauvegarde');
+      console.error('Détails de l\'erreur:', error.response?.data);
+      if (error.response?.status === 401) {
+        setError('Session expirée. Veuillez vous reconnecter.');
+      } else {
+        setError(error.response?.data?.message || 'Erreur serveur: ' + (error.response?.data?.error || error.message));
+      }
       setSaveStatus('error');
     }
+  };
+
+  // Fonction pour convertir un créneau en disponibilité
+  const convertSlotToAvailability = (slot) => {
+    return {
+      day: slot.day,
+      time: slot.time,
+      startTime: slot.time,
+      endTime: addMinutes(slot.time, 30)
+    };
   };
 
   const navigatePeriod = (direction) => {
@@ -499,6 +669,9 @@ const Calendar = ({ isDarkMode }) => {
         break;
       case 'month':
         newDate.setMonth(newDate.getMonth() + direction);
+        break;
+      default:
+        newDate.setDate(newDate.getDate() + direction);
         break;
     }
     
@@ -532,19 +705,264 @@ const Calendar = ({ isDarkMode }) => {
     {
       mode: 'view',
       label: 'Voir',
-      icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z'
+      icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z',
+      onClick: () => {
+        setMode('view');
+        setSelectionType('single');
+        setSelectedSlots([]);
+        setIsAddMenuOpen(false);
+      }
     },
     {
       mode: 'add',
       label: 'Ajouter',
-      icon: 'M12 6v6m0 0v6m0-6h6m-6 0H6'
+      icon: 'M12 6v6m0 0v6m0-6h6m-6 0H6',
+      onClick: () => {
+        setIsAddMenuOpen(!isAddMenuOpen);
+        if (!isAddMenuOpen) {
+          setMode('add');
+          setSelectionType('single');
+          setSelectedSlots([]);
+        }
+      }
     },
     {
       mode: 'delete',
       label: 'Supprimer',
-      icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+      icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
+      onClick: () => {
+        setMode('delete');
+        setSelectionType('single');
+        setSelectedSlots([]);
+        setIsAddMenuOpen(false);
+      }
     }
   ];
+
+  // Ajouter cette fonction pour rendre les boutons de la sidebar selon le mode
+  const renderSidebarButtons = () => {
+    // Modifier les styles des boutons dans renderSidebarButtons
+    const buttonBaseStyle = `
+      w-full px-4 py-3 rounded-lg font-medium
+      relative overflow-hidden
+      transition-all duration-300
+      border border-opacity-20
+      flex items-center justify-center
+      gap-2
+      backdrop-filter backdrop-blur-sm
+      shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]
+    `;
+
+    // Style pour les boutons d'action (Sauvegarder/Confirmer)
+    const actionButtonStyle = `
+      ${buttonBaseStyle}
+      ${isDarkMode
+        ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-400/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+        : 'bg-emerald-50 hover:bg-emerald-100/80 text-emerald-700 border-emerald-200'
+      }
+    `;
+
+    // Style pour les boutons d'annulation
+    const cancelButtonStyle = `
+      ${buttonBaseStyle}
+      ${isDarkMode
+        ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-400/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]'
+        : 'bg-rose-50 hover:bg-rose-100/80 text-rose-700 border-rose-200'
+      }
+    `;
+
+    // Style pour les boutons normaux
+    const normalButtonStyle = `
+      ${buttonBaseStyle}
+      ${isDarkMode
+        ? 'bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 border-gray-500/30'
+        : 'bg-white/80 hover:bg-gray-50/80 text-gray-700 border-gray-200'
+      }
+    `;
+
+    // Style pour le bouton actif
+    const activeButtonStyle = `
+      ${buttonBaseStyle}
+      ${isDarkMode
+        ? 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border-indigo-400/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]'
+        : 'bg-indigo-50 hover:bg-indigo-100/80 text-indigo-700 border-indigo-200'
+      }
+    `;
+
+    // Mode de sélection (add avec un type de sélection)
+    if (mode === 'add' && selectionType) {
+      return (
+        <div className="flex flex-col space-y-3">
+          <motion.button
+            whileHover={{ scale: 1.02, translateY: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={saveAvailabilities}
+            className={actionButtonStyle}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            Sauvegarder
+          </motion.button>
+          
+          <motion.button
+            whileHover={{ scale: 1.02, translateY: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => {
+              setMode('view');
+              setSelectionType(null);
+              setSelectedSlots([]);
+            }}
+            className={cancelButtonStyle}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Annuler
+          </motion.button>
+        </div>
+      );
+    }
+
+    // Mode de suppression
+    if (mode === 'delete') {
+      return (
+        <div className="flex flex-col space-y-3">
+          <motion.button
+            whileHover={{ scale: 1.02, translateY: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={saveAvailabilities}
+            className={actionButtonStyle}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            Confirmer
+          </motion.button>
+          
+          <motion.button
+            whileHover={{ scale: 1.02, translateY: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => {
+              setMode('view');
+              setUnsavedAvailabilities([]);
+            }}
+            className={cancelButtonStyle}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Annuler
+          </motion.button>
+        </div>
+      );
+    }
+
+    // Mode vue normale
+    return (
+      <div className="flex flex-col space-y-2">
+        {sidebarButtons.map(({ mode: buttonMode, label, icon, onClick }) => (
+          <div key={buttonMode} className="relative">
+            <motion.button
+              whileHover={{ scale: 1.02, translateY: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                if (onClick) {
+                  onClick();
+                } else {
+                  setMode(buttonMode);
+                  setSelectedSlots([]);
+                  setUnsavedAvailabilities([]);
+                }
+              }}
+              className={mode === buttonMode ? activeButtonStyle : normalButtonStyle}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
+              </svg>
+              {label}
+            </motion.button>
+
+            {/* Menu déroulant pour le bouton Ajouter */}
+            {buttonMode === 'add' && isAddMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className={`
+                  absolute z-50 left-0 mt-2 w-64 rounded-lg
+                  backdrop-filter backdrop-blur-md
+                  border border-opacity-20
+                  shadow-[0_0_15px_rgba(0,0,0,0.1)]
+                  ${isDarkMode 
+                    ? 'bg-gray-900/70 border-gray-700' 
+                    : 'bg-white/90 border-gray-200'
+                  }
+                `}
+              >
+                <div className="py-1">
+                  {addMenuItems.map((item) => (
+                    <motion.button
+                      key={item.id}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={item.onClick}
+                      className={`
+                        w-full flex items-center px-4 py-2 text-sm
+                        ${isDarkMode
+                          ? 'text-gray-200 hover:bg-gray-700'
+                          : 'text-gray-700 hover:bg-gray-100'
+                        }
+                      `}
+                    >
+                      <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+                      </svg>
+                      {item.label}
+                    </motion.button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  useEffect(() => {
+    const fetchAvailabilities = async () => {
+      try {
+        const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+        const user = JSON.parse(sessionStorage.getItem('user'));
+
+        if (!token || !user) {
+          setError('Session expirée. Veuillez vous reconnecter.');
+          return;
+        }
+
+        const response = await axios.get(
+          `${config.API_URL}/api/teacher/availabilities`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        setAvailabilities(response.data);
+      } catch (error) {
+        console.error('Erreur lors du chargement des disponibilités:', error);
+        if (error.response?.status === 401) {
+          setError('Session expirée. Veuillez vous reconnecter.');
+        } else {
+          setError('Erreur lors du chargement des disponibilités');
+        }
+      }
+    };
+
+    fetchAvailabilities();
+  }, []);
 
   return (
     <div className="w-full h-[calc(100vh-6rem)] p-2 sm:p-4 mb-8">
@@ -553,7 +971,7 @@ const Calendar = ({ isDarkMode }) => {
           ? 'bg-gray-800 border border-gray-700' 
           : 'bg-white'
       }`}>
-        {/* Sidebar toujours visible (retirer l'AnimatePresence et la condition) */}
+        {/* Sidebar toujours visible */}
         <div className={`w-52 p-4 border-r ${
           isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200'
         }`}>
@@ -572,36 +990,12 @@ const Calendar = ({ isDarkMode }) => {
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
                 <div className={`h-px flex-1 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
-                <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Action</span>
+                <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {mode === 'view' ? 'Action' : mode === 'add' ? 'Sélection' : 'Suppression'}
+                </span>
                 <div className={`h-px flex-1 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
               </div>
-              <div className="flex flex-row lg:flex-col space-x-2 lg:space-x-0 lg:space-y-2">
-                {sidebarButtons.map(({ mode: buttonMode, label, icon }) => (
-                  <motion.button
-                    key={buttonMode}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      setMode(buttonMode);
-                      setSelectedSlots([]);
-                      setUnsavedAvailabilities([]);
-                    }}
-                    className={`
-                      flex-1 lg:flex-none px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all
-                      ${mode === buttonMode  // Comparer mode (état) avec buttonMode (prop du bouton)
-                        ? isDarkMode
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-indigo-100 text-indigo-700'
-                        : isDarkMode
-                          ? 'text-gray-300 hover:bg-gray-700'
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }
-                    `}
-                  >
-                    {label}
-                  </motion.button>
-                ))}
-              </div>
+              {renderSidebarButtons()}
             </div>
 
             {/* Légende */}
@@ -755,6 +1149,26 @@ const Calendar = ({ isDarkMode }) => {
               (isDarkMode ? 'bg-red-800/90 text-red-300' : 'bg-red-100 text-red-700')
           }`}>
             {saveStatus}
+          </div>
+        )}
+
+        {/* Message d'erreur */}
+        {error && (
+          <div className={`
+            fixed top-4 right-4 p-4 rounded-lg shadow-lg
+            ${isDarkMode ? 'bg-red-900/90 text-red-200' : 'bg-red-100 text-red-800'}
+          `}>
+            {error}
+          </div>
+        )}
+
+        {/* Message de succès */}
+        {saveStatus === 'saved' && (
+          <div className={`
+            fixed top-4 right-4 p-4 rounded-lg shadow-lg
+            ${isDarkMode ? 'bg-green-900/90 text-green-200' : 'bg-green-100 text-green-800'}
+          `}>
+            Disponibilités sauvegardées avec succès
           </div>
         )}
       </div>

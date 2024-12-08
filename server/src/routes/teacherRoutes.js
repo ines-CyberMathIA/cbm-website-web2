@@ -8,8 +8,8 @@ const router = express.Router();
 // Récupérer les disponibilités d'un professeur
 router.get('/availabilities', authMiddleware, async (req, res) => {
   try {
-    console.log('Récupération des disponibilités pour le professeur:', req.user._id);
-    const availabilities = await TeacherAvailability.find({ teacherId: req.user._id });
+    console.log('Récupération des disponibilités pour le professeur:', req.user.userId);
+    const availabilities = await TeacherAvailability.find({ teacherId: req.user.userId });
     console.log('Disponibilités trouvées:', availabilities);
     res.json(availabilities);
   } catch (error) {
@@ -21,7 +21,7 @@ router.get('/availabilities', authMiddleware, async (req, res) => {
 // Sauvegarder les disponibilités
 router.post('/availabilities', authMiddleware, async (req, res) => {
   try {
-    console.log('Sauvegarde des disponibilités pour le professeur:', req.user._id);
+    console.log('Sauvegarde des disponibilités pour le professeur:', req.user.userId);
     const { availabilities } = req.body;
     
     if (!Array.isArray(availabilities)) {
@@ -61,11 +61,11 @@ router.post('/availabilities', authMiddleware, async (req, res) => {
     }
 
     console.log('Suppression des anciennes disponibilités');
-    await TeacherAvailability.deleteMany({ teacherId: req.user._id });
+    await TeacherAvailability.deleteMany({ teacherId: req.user.userId });
     
     console.log('Création des nouvelles disponibilités:', availabilities.length);
     const newAvailabilities = availabilities.map(slot => ({
-      teacherId: req.user._id,
+      teacherId: req.user.userId,
       day: slot.day,
       startTime: slot.startTime,
       endTime: slot.endTime
