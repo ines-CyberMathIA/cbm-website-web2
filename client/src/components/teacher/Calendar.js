@@ -578,6 +578,10 @@ const Calendar = ({ isDarkMode }) => {
       if (!token || !user) {
         setError('Session expirée. Veuillez vous reconnecter.');
         setSaveStatus('error');
+        setTimeout(() => {
+          setError(null);
+          setSaveStatus('');
+        }, 3000);
         return;
       }
 
@@ -588,6 +592,10 @@ const Calendar = ({ isDarkMode }) => {
         if (!validateTimeSlots(selectedSlots)) {
           setError('Chaque plage horaire doit faire au minimum 1h30 (3 créneaux consécutifs)');
           setSaveStatus('error');
+          setTimeout(() => {
+            setError(null);
+            setSaveStatus('');
+          }, 3000);
           return;
         }
 
@@ -672,6 +680,10 @@ const Calendar = ({ isDarkMode }) => {
         setError(error.response?.data?.message || 'Erreur serveur: ' + (error.response?.data?.error || error.message));
       }
       setSaveStatus('error');
+      setTimeout(() => {
+        setError(null);
+        setSaveStatus('');
+      }, 3000);
     }
   };
 

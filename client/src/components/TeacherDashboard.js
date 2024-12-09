@@ -47,6 +47,24 @@ const TeacherDashboard = () => {
     }
   };
 
+  const handleLogout = () => {
+    try {
+      // Nettoyer le localStorage et sessionStorage
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+
+      // Utiliser un setTimeout pour s'assurer que le nettoyage est terminé
+      setTimeout(() => {
+        // Rediriger vers la page de connexion
+        navigate('/login', { replace: true });
+      }, 0);
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+    }
+  };
+
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
       {/* Header avec bouton menu */}
@@ -106,10 +124,7 @@ const TeacherDashboard = () => {
 
               {/* Bouton déconnexion */}
               <button
-                onClick={() => {
-                  sessionStorage.clear();
-                  navigate('/login');
-                }}
+                onClick={handleLogout}
                 className={`p-2 rounded-lg ${
                   isDarkMode 
                     ? 'hover:bg-gray-700 text-gray-200' 
