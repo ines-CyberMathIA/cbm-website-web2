@@ -639,12 +639,6 @@ const Calendar = ({ isDarkMode }) => {
 
       if (mode === 'add' && selectedSlots.length > 0) {
         if (!validateTimeSlots(selectedSlots)) {
-          setError('Chaque plage horaire doit faire au minimum 1h30 (3 créneaux consécutifs)');
-          setSaveStatus('error');
-          setTimeout(() => {
-            setError(null);
-            setSaveStatus('');
-          }, 3000);
           return;
         }
 
@@ -678,13 +672,16 @@ const Calendar = ({ isDarkMode }) => {
           // Mettre à jour l'état avec les données fraîches du serveur
           setAvailabilities(getResponse.data);
           setSelectedSlots([]);
-          setSaveStatus('saved');
           setMode('view');
           setSelectionType('single');
 
+          setNotification({
+            message: 'Disponibilités ajoutées avec succès',
+            type: 'success'
+          });
+          
           setTimeout(() => {
-            setSaveStatus('');
-            setError(null);
+            setNotification({ message: '', type: '' });
           }, 2000);
         }
       } else if (mode === 'delete' && unsavedAvailabilities.length > 0) {
