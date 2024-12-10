@@ -2,6 +2,7 @@ import express from 'express';
 import TeacherAvailability from '../models/TeacherAvailability.js';
 import Message from '../models/Message.js';
 import authMiddleware from '../middleware/authMiddleware.js';
+import User from '../models/User.js';
 
 const router = express.Router();
 
@@ -249,6 +250,28 @@ router.post('/availabilities/delete', authMiddleware, async (req, res) => {
       message: 'Erreur lors de la suppression des disponibilités',
       error: error.message 
     });
+  }
+});
+
+router.get('/manager-info', authMiddleware, async (req, res) => {
+  try {
+    const teacher = await User.findById(req.user.userId).populate('managerId');
+    
+    if (!teacher.managerId) {
+      return res.status(404).json({ message: "Aucun manager n'est assigné" });
+    }
+
+    const manager = teacher.managerId;
+    res.json({
+      id: manager._id,
+      firstName: manager.firstName,
+      lastName: manager.lastName,
+      email: manager.email,
+      isOnline: manager.isOnline || false
+    });
+  } catch (error) {
+    console.error('Erreur lors de la récupération des informations du manager:', error);
+    res.status(500).json({ message: "Erreur serveur" });
   }
 });
 

@@ -19,13 +19,10 @@ const AdminLogin = () => {
     try {
       if (!showTwoFactor) {
         // Première étape : vérification des identifiants
-        console.log('Envoi des identifiants admin:', { login });
         const response = await axios.post('http://localhost:5000/api/admin/login', {
           login,
           password
         });
-
-        console.log('Réponse du serveur (login):', response.data);
 
         if (response.data.requireTwoFactor) {
           setShowTwoFactor(true);
@@ -34,18 +31,18 @@ const AdminLogin = () => {
         }
       } else {
         // Deuxième étape : vérification du code 2FA
-        console.log('Envoi du code 2FA');
         const response = await axios.post('http://localhost:5000/api/admin/verify-2fa', {
           login,
           twoFactorCode
         });
 
-        console.log('Réponse du serveur (2FA):', response.data);
-
         if (response.data.token) {
+          // Stocker les informations dans le sessionStorage
           sessionStorage.setItem('token', response.data.token);
           sessionStorage.setItem('user', JSON.stringify(response.data.user));
-          navigate('/admin/dashboard');
+          
+          // Utiliser replace: true pour éviter les problèmes de navigation
+          navigate('/admin/dashboard', { replace: true });
           return;
         }
       }

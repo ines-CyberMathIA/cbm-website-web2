@@ -1,6 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import config from '../config';
+
+const api = axios.create({
+  baseURL: config.API_URL,
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+});
 
 const AuthContext = createContext();
 
@@ -22,7 +32,7 @@ export const AuthProvider = ({ children }) => {
         try {
           const userData = JSON.parse(storedUser);
           setUser(userData);
-          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         } catch (error) {
           console.error('Erreur lors de l\'initialisation de l\'auth:', error);
           sessionStorage.clear();
@@ -36,7 +46,8 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     try {
-      const response = await axios.post('https://localhost:5000/api/users/login', credentials);
+      const response = await api.post('/api/users/login', credentials);
+
       const { token, user: userData } = response.data;
       
       if (!token || !userData) {
@@ -46,16 +57,15 @@ export const AuthProvider = ({ children }) => {
       sessionStorage.setItem('token', token);
       sessionStorage.setItem('user', JSON.stringify(userData));
       
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(userData);
       
       return { success: true, user: userData };
     } catch (error) {
       console.error('Erreur de connexion:', error);
-      // Nettoyer les données d'authentification en cas d'erreur
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
-      delete axios.defaults.headers.common['Authorization'];
+      delete api.defaults.headers.common['Authorization'];
       return {
         success: false,
         error: error.response?.data?.message || 'Erreur de connexion'
@@ -65,7 +75,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     sessionStorage.clear();
-    delete axios.defaults.headers.common['Authorization'];
+    delete api.defaults.headers.common['Authorization'];
     setUser(null);
     navigate('/login', { replace: true });
   };

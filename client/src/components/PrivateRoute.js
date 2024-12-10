@@ -1,25 +1,20 @@
-import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const PrivateRoute = ({ children, role }) => {
-  const { user, loading } = useAuth();
-  const location = useLocation();
+  const navigate = useNavigate();
+  const token = sessionStorage.getItem('token');
+  const user = JSON.parse(sessionStorage.getItem('user') || '{}');
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!token || !user || user.role !== role) {
+      navigate('/login', { replace: true });
+    }
+  }, [token, user, role, navigate]);
 
-  if (!user) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
-  }
-
-  if (role && user.role !== role) {
-    return <Navigate to={`/${user.role}/dashboard`} replace />;
+  if (!token || !user || user.role !== role) {
+    return null;
   }
 
   return children;

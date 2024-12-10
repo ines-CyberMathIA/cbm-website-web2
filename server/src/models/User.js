@@ -64,6 +64,11 @@ const userSchema = new mongoose.Schema({
   notificationEmail: {
     type: String,
     required: function() { return this.role === 'admin'; }
+  },
+  managerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: function() { return this.role === 'teacher'; }
   }
 });
 

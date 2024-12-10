@@ -17,17 +17,21 @@ const Messages = ({ isDarkMode }) => {
   useEffect(() => {
     const fetchManagerInfo = async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/api/users/${user.managerId}`);
+        const token = sessionStorage.getItem('token');
+        const response = await axios.get(
+          'http://localhost:5000/api/teacher/manager-info',
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
         setManagerInfo(response.data);
       } catch (error) {
-        console.error('Erreur lors de la récupération des informations du manager:', error);
+        console.error('Erreur lors de la récupération des infos du manager:', error);
       }
     };
 
-    if (user?.managerId) {
-      fetchManagerInfo();
-    }
-  }, [user?.managerId]);
+    fetchManagerInfo();
+  }, []);
 
   const channels = [
     {
@@ -254,6 +258,11 @@ const Messages = ({ isDarkMode }) => {
                       : 'bg-white/80 text-gray-800'
                 }`}
               >
+                {message.senderId !== user._id && activeChannel === 'manager' && managerInfo && (
+                  <div className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {`${managerInfo.firstName} ${managerInfo.lastName}`}
+                  </div>
+                )}
                 <p className="break-words">{message.content}</p>
                 <p className={`text-xs mt-2 ${
                   message.senderId === user._id ? 'text-blue-100' : isDarkMode ? 'text-gray-400' : 'text-gray-500'

@@ -17,35 +17,16 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Configuration CORS spécifique
+// Configuration CORS simplifiée
 const corsOptions = {
-  origin: 'http://localhost:3000',
+  origin: 'http://localhost:3000',  // Uniquement HTTP
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'Cache-Control',
-    'Pragma',
-    'Expires'
-  ],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization']
 };
 
-// Appliquer CORS à toutes les routes
+// Appliquer CORS avec les options
 app.use(cors(corsOptions));
-
-// Middleware pour les erreurs CORS
-app.use((err, req, res, next) => {
-  if (err.name === 'CORSError') {
-    console.error('Erreur CORS:', err);
-    res.status(500).json({ 
-      message: 'Erreur CORS',
-      error: err.message 
-    });
-  } else {
-    next(err);
-  }
-});
 
 // Routes
 app.use('/api/users', userRoutes);
