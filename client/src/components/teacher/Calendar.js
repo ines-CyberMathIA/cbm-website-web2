@@ -625,17 +625,13 @@ const Calendar = ({ isDarkMode }) => {
       const user = JSON.parse(sessionStorage.getItem('user'));
 
       if (!token || !user) {
-        setError('Session expirée. Veuillez vous reconnecter.');
-        setSaveStatus('error');
-        setTimeout(() => {
-          setError(null);
-          setSaveStatus('');
-        }, 3000);
+        setNotification({
+          message: 'Session expirée. Veuillez vous reconnecter.',
+          type: 'error'
+        });
+        setTimeout(() => setNotification({ message: '', type: '' }), 3000);
         return;
       }
-
-      setSaveStatus('saving');
-      setError(null);
 
       if (mode === 'add' && selectedSlots.length > 0) {
         if (!validateTimeSlots(selectedSlots)) {
@@ -685,29 +681,15 @@ const Calendar = ({ isDarkMode }) => {
           }, 2000);
         }
       } else if (mode === 'delete' && unsavedAvailabilities.length > 0) {
-        // Vérifier que les plages horaires restantes seront valides après suppression
         if (!validateTimeSlots(unsavedAvailabilities, true)) {
-          setNotification({
-            message: 'La suppression est impossible car certaines plages horaires deviendraient inférieures à 1h30',
-            type: 'error'
-          });
-          setTimeout(() => setNotification({ message: '', type: '' }), 3000);
           return;
         }
 
-        // Si la validation réussit, on procède à la suppression
-        const slotsToDelete = convertSlotsToRanges(unsavedAvailabilities);
-        
-        console.log('Slots à supprimer (avant envoi):', slotsToDelete);
-        console.log('Payload complet:', { availabilitiesToDelete: slotsToDelete });
-
         try {
+          const slotsToDelete = convertSlotsToRanges(unsavedAvailabilities);
           const deleteResponse = await axios.post(
             `${config.API_URL}/api/teacher/availabilities/delete`,
-            { 
-              availabilitiesToDelete: slotsToDelete,
-              teacherId: JSON.parse(sessionStorage.getItem('user')).userId // Ajout explicite de l'ID
-            },
+            { availabilitiesToDelete: slotsToDelete },
             {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -717,62 +699,41 @@ const Calendar = ({ isDarkMode }) => {
           );
 
           if (deleteResponse.data && deleteResponse.status === 200) {
-            try {
-              // Recharger les disponibilités après la suppression
-              const getResponse = await axios.get(
-                `${config.API_URL}/api/teacher/availabilities`,
-                {
-                  headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                  },
-                  // Utiliser les options axios pour éviter le cache
-                  params: {
-                    _: new Date().getTime() // Ajouter un timestamp comme paramètre
-                  }
+            // Recharger les disponibilités
+            const getResponse = await axios.get(
+              `${config.API_URL}/api/teacher/availabilities`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
                 }
-              );
+              }
+            );
 
-              // Mise à jour de l'état avec les nouvelles données
-              setAvailabilities(getResponse.data);
-              setUnsavedAvailabilities([]);
-              setMode('view');
-              
-              setNotification({
-                message: 'Les disponibilités ont été supprimées avec succès',
-                type: 'success'
-              });
-              
-              setTimeout(() => {
-                setError(null);
-                setNotification({ message: '', type: '' });
-              }, 2000);
-            } catch (error) {
-              console.error('Erreur lors du rechargement des données:', error);
-              setError('Les disponibilités ont été supprimées mais le rechargement a échoué');
-              setTimeout(() => setError(null), 3000);
-            }
+            setAvailabilities(getResponse.data);
+            setUnsavedAvailabilities([]);
+            setMode('view');
+            
+            setNotification({
+              message: 'Les disponibilités ont été supprimées avec succès',
+              type: 'success'
+            });
+            setTimeout(() => setNotification({ message: '', type: '' }), 2000);
           }
         } catch (error) {
-          console.error('Erreur détaillée:', error);
-          console.error('Réponse du serveur en cas d\'erreur:', error.response);
-          setError(error.response?.data?.message || 'Erreur lors de la suppression des disponibilités');
-          setTimeout(() => setError(null), 3000);
+          setNotification({
+            message: error.response?.data?.message || 'Erreur lors de la suppression des disponibilités',
+            type: 'error'
+          });
+          setTimeout(() => setNotification({ message: '', type: '' }), 3000);
         }
       }
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde:', error);
-      console.error('Détails de l\'erreur:', error.response?.data);
-      if (error.response?.status === 401) {
-        setError('Session expirée. Veuillez vous reconnecter.');
-      } else {
-        setError(error.response?.data?.message || 'Erreur serveur: ' + (error.response?.data?.error || error.message));
-      }
-      setSaveStatus('error');
-      setTimeout(() => {
-        setError(null);
-        setSaveStatus('');
-      }, 3000);
+      setNotification({
+        message: error.response?.data?.message || 'Une erreur est survenue',
+        type: 'error'
+      });
+      setTimeout(() => setNotification({ message: '', type: '' }), 3000);
     }
   };
 

@@ -1,33 +1,28 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
-const PrivateRoute = ({ children }) => {
-  const token = sessionStorage.getItem('token');
-  const userStr = sessionStorage.getItem('user');
+const PrivateRoute = ({ children, role }) => {
+  const { user, loading } = useAuth();
+  const location = useLocation();
 
-  if (!token || !userStr) {
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
-    return <Navigate to="/login" />;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
   }
 
-  try {
-    const user = JSON.parse(userStr);
-    const path = window.location.pathname;
-    const correctPath = `/${user.role}/dashboard`;
-
-    if (!path.includes(`/${user.role}/`)) {
-      return <Navigate to={correctPath} />;
-    }
-
-    return children;
-
-  } catch (error) {
-    console.error('Erreur lors de la lecture des données utilisateur:', error);
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
-    return <Navigate to="/login" />;
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
+
+  if (role && user.role !== role) {
+    return <Navigate to={`/${user.role}/dashboard`} replace />;
+  }
+
+  return children;
 };
 
-export default PrivateRoute; 
+export default PrivateRoute;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
 
 const Login = ({ isDarkMode }) => {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ const Login = ({ isDarkMode }) => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -28,33 +30,20 @@ const Login = ({ isDarkMode }) => {
     setLoading(true);
 
     try {
-      sessionStorage.clear();
-
-      const response = await axios.post('http://localhost:5000/api/users/login', {
+      const { success, error: loginError, user: userData } = await login({
         email: formData.email.toLowerCase(),
         password: formData.password,
         role: formData.role
       });
 
-      if (response.data.token && response.data.user) {
-        sessionStorage.setItem('token', response.data.token);
-        sessionStorage.setItem('user', JSON.stringify({
-          id: response.data.user.id,
-          role: response.data.user.role,
-          firstName: response.data.user.firstName,
-          lastName: response.data.user.lastName
-        }));
-
-        navigate(`/${response.data.user.role}/dashboard`);
+      if (success && userData) {
+        navigate(`/${userData.role}/dashboard`, { replace: true });
+      } else {
+        setError(loginError || 'Erreur de connexion');
       }
     } catch (error) {
       console.error('Erreur de connexion:', error);
-      
-      if (error.response?.status === 401) {
-        setError('Email ou mot de passe incorrect');
-      } else {
-        setError(error.response?.data?.message || 'Une erreur est survenue lors de la connexion');
-      }
+      setError(error.response?.data?.message || 'Une erreur est survenue');
     } finally {
       setLoading(false);
     }
