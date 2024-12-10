@@ -8,6 +8,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import managerRoutes from './routes/managerRoutes.js';
 import teacherRoutes from './routes/teacherRoutes.js';
 import childrenRoutes from './routes/childrenRoutes.js';
+import messageRoutes from './routes/messageRoutes.js';
 
 dotenv.config();
 
@@ -34,6 +35,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/manager', managerRoutes);
 app.use('/api/teacher', teacherRoutes);
 app.use('/api/children', childrenRoutes);
+app.use('/api/messages', messageRoutes);
 
 // Route de test CORS
 app.options('*', cors(corsOptions));

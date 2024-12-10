@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import User from '../models/User.js';
 import PendingManager from '../models/PendingManager.js';
+import MessageChannel from '../models/MessageChannel.js';
 
 const router = express.Router();
 
@@ -408,6 +409,70 @@ router.post('/pending-managers/:id/resend', authMiddleware, adminMiddleware, asy
     res.status(500).json({ 
       message: 'Erreur lors du renvoi de l\'invitation',
       error: error.message 
+    });
+  }
+});
+
+// Route pour changer le manager d'un professeur
+router.put('/update-teacher-manager/:teacherId', authMiddleware, async (req, res) => {
+  try {
+    // Vérifier que l'utilisateur est admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    const { teacherId } = req.params;
+    const { managerId } = req.body;
+
+    // Vérifier que le professeur existe
+    const teacher = await User.findOne({ _id: teacherId, role: 'teacher' });
+    if (!teacher) {
+      return res.status(404).json({ message: 'Professeur non trouvé' });
+    }
+
+    // Vérifier que le nouveau manager existe
+    const manager = await User.findOne({ _id: managerId, role: 'manager' });
+    if (!manager) {
+      return res.status(404).json({ message: 'Manager non trouvé' });
+    }
+
+    // Mettre à jour le manager du professeur
+    teacher.managerId = managerId;
+    await teacher.save();
+
+    // Mettre à jour ou créer le canal de message
+    const existingChannel = await MessageChannel.findOne({
+      $or: [
+        { teacher: teacherId, manager: managerId },
+        { teacher: teacherId }
+      ]
+    });
+
+    if (existingChannel) {
+      existingChannel.manager = managerId;
+      await existingChannel.save();
+    } else {
+      await MessageChannel.create({
+        teacher: teacherId,
+        manager: managerId
+      });
+    }
+
+    res.json({ 
+      message: 'Manager mis à jour avec succès',
+      teacher: {
+        id: teacher._id,
+        firstName: teacher.firstName,
+        lastName: teacher.lastName,
+        managerId: teacher.managerId
+      }
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour du manager:', error);
+    res.status(500).json({ 
+      message: 'Erreur lors de la mise à jour du manager',
+      error: error.message
     });
   }
 });

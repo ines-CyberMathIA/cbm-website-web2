@@ -16,12 +16,18 @@ const messageChannelSchema = new mongoose.Schema({
     default: Date.now
   },
   unreadCount: {
-    manager: { type: Number, default: 0 },
-    teacher: { type: Number, default: 0 }
+    manager: {
+      type: Number,
+      default: 0
+    },
+    teacher: {
+      type: Number,
+      default: 0
+    }
   }
 }, { timestamps: true });
 
 // Index pour rechercher rapidement les canaux d'un utilisateur
-messageChannelSchema.index({ manager: 1, teacher: 1 }, { unique: true });
+messageChannelSchema.index({ manager: 1, teacher: 1 });
 
 export default mongoose.model('MessageChannel', messageChannelSchema);

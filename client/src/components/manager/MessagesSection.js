@@ -123,32 +123,49 @@ const MessagesSection = () => {
     return () => clearInterval(interval);
   }, [selectedChannel]);
 
+  // Envoyer un message
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedChannel || isLoading) return;
+    if (!newMessage.trim() || !selectedChannel) return;
 
     try {
-      setIsLoading(true);
       const response = await axios.post(
-        `http://localhost:5000/api/manager/channels/${selectedChannel._id}/messages`,
-        { content: newMessage },
+        'http://localhost:5000/api/messages/send',
+        {
+          content: newMessage,
+          channelId: selectedChannel._id
+        },
         getAxiosConfig()
       );
+
+      // Ajouter le nouveau message à la liste
       setMessages([...messages, response.data]);
       setNewMessage('');
       scrollToBottom();
     } catch (error) {
       console.error('Erreur lors de l\'envoi du message:', error);
-      if (error.response?.status === 401) {
-        alert('Session expirée. Veuillez vous reconnecter.');
-        window.location.href = '/login';
-      } else {
-        alert('Erreur lors de l\'envoi du message. Veuillez réessayer.');
-      }
-    } finally {
-      setIsLoading(false);
+      alert('Erreur lors de l\'envoi du message. Veuillez réessayer.');
     }
   };
+
+  // Mettre à jour les messages en temps réel
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (selectedChannel) {
+        try {
+          const response = await axios.get(
+            `http://localhost:5000/api/messages/channel/${selectedChannel._id}`,
+            getAxiosConfig()
+          );
+          setMessages(response.data);
+        } catch (error) {
+          console.error('Erreur lors de la mise à jour des messages:', error);
+        }
+      }
+    }, 5000); // Mettre à jour toutes les 5 secondes
+
+    return () => clearInterval(interval);
+  }, [selectedChannel]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

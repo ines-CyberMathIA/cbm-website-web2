@@ -66,7 +66,7 @@ router.get('/my-teachers', authMiddleware, async (req, res) => {
     // Récupérer les professeurs actifs
     const activeTeachers = await User.find({
       role: 'teacher',
-      createdBy: managerId
+      managerId: managerId
     }).select('-password');
     
     console.log('Professeurs actifs trouvés:', { count: activeTeachers.length });

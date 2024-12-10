@@ -257,6 +257,7 @@ router.post('/complete-teacher-registration', async (req, res) => {
       role: 'teacher',
       speciality: pendingTeacher.speciality,
       level: pendingTeacher.level,
+      managerId: pendingTeacher.managerId,
       createdBy: pendingTeacher.managerId
     });
 
