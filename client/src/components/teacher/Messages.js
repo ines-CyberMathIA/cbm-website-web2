@@ -134,21 +134,39 @@ const Messages = ({ isDarkMode }) => {
                 <button
                   onClick={() => setActiveChannel(managerInfo)}
                   className={`w-full p-4 transition-all duration-200 ${
-                    activeChannel ? 'bg-gradient-to-r from-cyan-400 to-blue-500' : ''
-                  } hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}
+                    activeChannel?.id === managerInfo.id
+                      ? isDarkMode
+                        ? 'bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border-l-4 border-l-blue-400'
+                        : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-l-blue-400'
+                      : ''
+                  } hover:${
+                    isDarkMode
+                      ? 'bg-gradient-to-r from-blue-500/10 to-indigo-500/10'
+                      : 'bg-gradient-to-r from-blue-50/70 to-indigo-50/70'
+                  }`}
                 >
                   <div className="flex items-center space-x-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-r from-cyan-400 to-blue-500`}>
-                      <span className="text-white text-lg font-medium">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                      isDarkMode 
+                        ? 'bg-gradient-to-r from-blue-500/30 to-indigo-500/30 border border-blue-400/30' 
+                        : 'bg-gradient-to-r from-blue-100 to-indigo-100 border border-blue-200'
+                    }`}>
+                      <span className={`text-lg font-medium ${
+                        isDarkMode ? 'text-blue-100' : 'text-blue-700'
+                      }`}>
                         {managerInfo.firstName[0]}{managerInfo.lastName[0]}
                       </span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className={`font-medium truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    <div>
+                      <div className={`font-medium ${
+                        isDarkMode ? 'text-blue-100' : 'text-blue-900'
+                      }`}>
                         {managerInfo.firstName} {managerInfo.lastName}
                       </div>
-                      <div className={`text-sm truncate ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Manager
+                      <div className={
+                        isDarkMode ? 'text-blue-300/70' : 'text-blue-600'
+                      }>
+                        {managerInfo.role}
                       </div>
                     </div>
                   </div>
@@ -194,52 +212,75 @@ const Messages = ({ isDarkMode }) => {
           {/* Zone des messages */}
           <div className="flex-1 overflow-y-auto p-4">
             <div className="space-y-4">
-              {messages.map((message, index) => (
-                <div
-                  key={message._id || index}
-                  className={`flex ${message.senderId._id === user.userId ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div className={`max-w-[70%] ${
-                    message.senderId._id === user.userId
-                      ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white'
-                      : isDarkMode
-                        ? 'bg-gray-700 text-white'
-                        : 'bg-white text-gray-900'
-                  } rounded-2xl px-4 py-2 shadow-sm`}>
-                    <p className="text-sm">{message.content}</p>
-                  </div>
-                </div>
-              ))}
+              {messages.map((message, index) => {
+                const isCurrentUser = message.senderId === user.userId;
+                return (
+                  <motion.div
+                    key={message._id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`max-w-[70%] ${isCurrentUser ? 'ml-auto' : 'mr-auto'}`}>
+                      <div className={`rounded-2xl px-4 py-3 shadow-sm ${
+                        isCurrentUser
+                          ? isDarkMode
+                            ? 'bg-gradient-to-r from-violet-500/30 to-purple-500/30 text-violet-50 border border-violet-400/30'
+                            : 'bg-gradient-to-r from-violet-100 to-purple-100 text-violet-900 border border-violet-200'
+                          : isDarkMode
+                            ? 'bg-gradient-to-r from-blue-500/30 to-indigo-500/30 text-blue-50 border border-blue-400/30'
+                            : 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-900 border border-blue-200'
+                      }`}>
+                        {message.content}
+                      </div>
+                      <div className={`text-xs mt-1 ${
+                        isDarkMode 
+                          ? isCurrentUser ? 'text-violet-300/70' : 'text-blue-300/70'
+                          : isCurrentUser ? 'text-violet-400' : 'text-blue-400'
+                      } ${isCurrentUser ? 'text-right' : 'text-left'}`}>
+                        {new Date(message.timestamp).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
           </div>
 
           {/* Zone de saisie */}
-          <div className={`p-4 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+          <div className={`p-4 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border-t ${
+            isDarkMode ? 'border-gray-700' : 'border-gray-200'
+          }`}>
             <form onSubmit={handleSendMessage} className="flex space-x-4">
               <input
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Écrivez votre message..."
-                className={`flex-1 px-4 py-2 rounded-xl ${
+                className={`flex-1 px-4 py-2 rounded-xl border ${
                   isDarkMode
-                    ? 'bg-gray-700 text-white placeholder-gray-400'
-                    : 'bg-gray-100 text-gray-900 placeholder-gray-500'
-                } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                    ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400'
+                    : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400'
+                } focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-transparent`}
               />
               <button
                 type="submit"
                 disabled={!newMessage.trim()}
-                className={`p-2 rounded-xl ${
+                className={`px-6 py-2 rounded-xl transition-all ${
                   newMessage.trim()
-                    ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white'
+                    ? isDarkMode
+                      ? 'bg-gradient-to-r from-violet-500/40 to-purple-500/40 text-violet-50 hover:from-violet-500/50 hover:to-purple-500/50'
+                      : 'bg-gradient-to-r from-violet-200 to-purple-200 text-violet-700 border border-violet-300 hover:from-violet-300 hover:to-purple-300'
                     : isDarkMode
                       ? 'bg-gray-700 text-gray-400'
                       : 'bg-gray-100 text-gray-400'
-                } transition-all duration-200`}
+                }`}
               >
-                <FiSend size={24} />
+                <FiSend size={20} />
               </button>
             </form>
           </div>

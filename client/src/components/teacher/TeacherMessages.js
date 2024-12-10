@@ -69,162 +69,146 @@ const TeacherMessages = ({ isDarkMode }) => {
   };
 
   return (
-    <div className={`flex flex-col h-full rounded-lg shadow-lg ${
-      isDarkMode ? 'bg-gray-800' : 'bg-white'
-    }`}>
-      {isLoading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className={`text-lg ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-            Chargement de la conversation...
-          </div>
-        </div>
-      ) : error ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className={`text-lg text-red-500`}>
-            {error}
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* En-tête avec les informations du manager */}
-          <div className={`p-4 border-b ${
-            isDarkMode ? 'border-gray-700' : 'border-gray-200'
-          }`}>
+    <div className="h-full p-4">
+      <div className={`flex flex-col h-full rounded-xl shadow-soft bg-opacity-80 backdrop-blur-sm ${
+        isDarkMode ? 'bg-gray-900/95' : 'bg-white/95'
+      }`}>
+        {isLoading ? (
+          <div className="flex-1 flex items-center justify-center">
             <div className="flex items-center space-x-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
-              }`}>
-                <span className="text-xl">
-                  {managerInfo ? managerInfo.firstName[0] + managerInfo.lastName[0] : 'M'}
-                </span>
-              </div>
-              <div>
-                <h2 className={`text-lg font-semibold ${
-                  isDarkMode ? 'text-gray-100' : 'text-gray-800'
-                }`}>
-                  {managerInfo 
-                    ? `${managerInfo.firstName} ${managerInfo.lastName}`
-                    : 'Votre Manager'}
-                </h2>
-                <p className={`text-sm ${
-                  isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  Manager
-                </p>
-              </div>
-              <div className={`ml-2 px-2 py-1 rounded-full text-xs ${
-                managerInfo?.isOnline 
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
-                {managerInfo?.isOnline ? 'En ligne' : 'Hors ligne'}
-              </div>
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-400"></div>
+              <span className={`text-lg ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                Chargement...
+              </span>
             </div>
           </div>
-
-          {/* Zone des messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.map((message) => (
-              <motion.div
-                key={message._id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex ${message.sender === 'teacher' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`flex ${message.sender === 'teacher' ? 'flex-row-reverse' : 'flex-row'} items-end space-x-2`}>
-                  {message.sender !== 'teacher' && (
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
-                    }`}>
-                      <span className="text-sm">
-                        {managerInfo ? managerInfo.firstName[0] + managerInfo.lastName[0] : 'M'}
-                      </span>
-                    </div>
-                  )}
-                  
-                  <div className={`p-3 rounded-lg max-w-[80%] ${
-                    message.sender === 'teacher'
-                      ? isDarkMode ? 'bg-blue-600' : 'bg-blue-100'
-                      : isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
-                  }`}>
-                    <div className={`text-sm font-medium mb-1 ${
-                      message.sender === 'teacher'
-                        ? isDarkMode ? 'text-blue-200' : 'text-blue-800'
-                        : isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                    }`}>
-                      {message.sender === 'teacher' 
-                        ? 'Vous' 
-                        : `${managerInfo.firstName} ${managerInfo.lastName} (Manager)`
-                      }
-                    </div>
-                    <p className={message.sender === 'teacher'
-                      ? (isDarkMode ? 'text-white' : 'text-blue-900')
-                      : (isDarkMode ? 'text-gray-100' : 'text-gray-900')
-                    }>
-                      {message.content}
-                    </p>
-                    <p className={`text-xs mt-1 ${
-                      isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                    }`}>
-                      {new Date(message.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Zone de saisie du message avec indicateur de frappe */}
-          <div className={`px-4 py-2 text-xs ${
-            isDarkMode ? 'text-gray-400' : 'text-gray-500'
-          }`}>
-            {/* Ajouter ici un indicateur de frappe si nécessaire */}
-          </div>
-
-          {/* Zone de saisie du message */}
-          <form onSubmit={sendMessage} className="p-4 border-t border-gray-200">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder={`Écrivez un message à ${managerInfo ? managerInfo.firstName : 'votre manager'}...`}
-                className={`flex-1 p-2 rounded-lg border ${
-                  isDarkMode 
-                    ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                    : 'bg-white border-gray-300 text-gray-900'
-                }`}
-              />
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                type="submit"
-                className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
-                  isDarkMode
-                    ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                    : 'bg-blue-100 hover:bg-blue-200 text-blue-900'
-                }`}
-              >
-                <span>Envoyer</span>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                </svg>
-              </motion.button>
-            </div>
-          </form>
-
-          {/* Message d'erreur */}
-          {error && (
-            <div className={`p-4 rounded-lg ${
-              isDarkMode ? 'bg-red-900/90 text-red-100' : 'bg-red-100 text-red-900'
-            }`}>
+        ) : error ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-rose-500 bg-rose-50 px-4 py-2 rounded-lg">
               {error}
             </div>
-          )}
-        </>
-      )}
+          </div>
+        ) : (
+          <>
+            {/* En-tête avec les informations du manager */}
+            <div className={`p-6 border-b ${
+              isDarkMode ? 'border-gray-800' : 'border-gray-100'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br ${
+                    isDarkMode 
+                      ? 'from-teal-800/40 to-emerald-800/40 text-teal-100' 
+                      : 'from-teal-50 to-emerald-50 text-teal-600'
+                  } shadow-sm`}>
+                    <span className="text-lg font-medium">
+                      {managerInfo ? managerInfo.firstName[0] + managerInfo.lastName[0] : 'M'}
+                    </span>
+                  </div>
+                  <div>
+                    <h2 className={`text-lg font-semibold ${
+                      isDarkMode ? 'text-gray-100' : 'text-gray-800'
+                    }`}>
+                      {managerInfo 
+                        ? `${managerInfo.firstName} ${managerInfo.lastName}`
+                        : 'Votre Manager'}
+                    </h2>
+                    <div className="flex items-center space-x-2">
+                      <span className={`text-sm ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                      }`}>
+                        Manager
+                      </span>
+                      <div className={`h-1.5 w-1.5 rounded-full ${
+                        managerInfo?.isOnline ? 'bg-teal-400' : 'bg-gray-400'
+                      }`}></div>
+                      <span className={`text-xs ${
+                        isDarkMode ? 'text-gray-500' : 'text-gray-400'
+                      }`}>
+                        {managerInfo?.isOnline ? 'En ligne' : 'Hors ligne'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Zone des messages */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {messages.map((message) => (
+                <motion.div
+                  key={message._id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex ${message.sender === 'teacher' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className={`max-w-[70%] ${
+                    message.sender === 'teacher'
+                      ? 'ml-auto'
+                      : 'mr-auto'
+                  }`}>
+                    <div className={`rounded-2xl px-4 py-3 ${
+                      message.sender === 'teacher'
+                        ? isDarkMode
+                          ? 'bg-slate-700 text-slate-100'
+                          : 'bg-slate-100 text-slate-700 border border-slate-200'
+                        : isDarkMode
+                          ? 'bg-gray-800/80 text-gray-100'
+                          : 'bg-gray-50 text-gray-700 border border-gray-100'
+                    } shadow-sm`}>
+                      {message.content}
+                    </div>
+                    <div className={`text-xs mt-1 ${
+                      isDarkMode ? 'text-gray-500' : 'text-gray-400'
+                    } ${
+                      message.sender === 'teacher' ? 'text-right' : 'text-left'
+                    }`}>
+                      {new Date(message.createdAt).toLocaleTimeString([], { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Zone de saisie */}
+            <form onSubmit={sendMessage} className="p-4 border-t border-gray-100">
+              <div className={`flex items-center space-x-4 rounded-xl p-2 ${
+                isDarkMode ? 'bg-gray-800' : 'bg-gray-50'
+              }`}>
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Écrivez votre message..."
+                  className={`flex-1 bg-transparent border-0 focus:ring-0 ${
+                    isDarkMode ? 'text-gray-100 placeholder-gray-500' : 'text-gray-800 placeholder-gray-400'
+                  }`}
+                />
+                <button
+                  type="submit"
+                  disabled={!newMessage.trim()}
+                  className={`px-4 py-2 rounded-lg transition-all ${
+                    newMessage.trim()
+                      ? isDarkMode
+                        ? 'bg-slate-600 text-slate-100 hover:bg-slate-500'
+                        : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
+                      : isDarkMode
+                        ? 'bg-gray-700 text-gray-400'
+                        : 'bg-gray-200 text-gray-400'
+                  }`}
+                >
+                  Envoyer
+                </button>
+              </div>
+            </form>
+          </>
+        )}
+      </div>
     </div>
   );
 };
 
-export default TeacherMessages; 
+export default TeacherMessages;
