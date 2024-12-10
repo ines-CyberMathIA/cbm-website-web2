@@ -184,30 +184,56 @@ router.post('/availabilities/delete', authMiddleware, async (req, res) => {
 
     // Pour chaque plage horaire à supprimer
     for (const slot of availabilitiesToDelete) {
-      console.log('Suppression de la plage horaire:', slot);
+      console.log('Traitement de la plage horaire:', slot);
       
-      // Trouver toutes les disponibilités qui se chevauchent avec la plage à supprimer
-      const result = await TeacherAvailability.deleteMany({
+      // Trouver les disponibilités qui contiennent cette plage
+      const availabilities = await TeacherAvailability.find({
         teacherId,
         day: slot.day,
-        $or: [
-          // Disponibilité qui commence pendant la plage à supprimer
-          {
-            startTime: { $gte: slot.startTime },
-            endTime: { $lte: slot.endTime }
-          },
-          // Disponibilité qui contient la plage à supprimer
-          {
-            startTime: { $lte: slot.startTime },
-            endTime: { $gte: slot.endTime }
-          }
-        ]
+        startTime: { $lte: slot.startTime },
+        endTime: { $gte: slot.endTime }
       });
 
-      console.log('Résultat de la suppression:', result);
+      // Pour chaque disponibilité trouvée
+      for (const avail of availabilities) {
+        // Si la plage à supprimer est au début
+        if (avail.startTime === slot.startTime) {
+          await TeacherAvailability.updateOne(
+            { _id: avail._id },
+            { $set: { startTime: slot.endTime } }
+          );
+        }
+        // Si la plage à supprimer est à la fin
+        else if (avail.endTime === slot.endTime) {
+          await TeacherAvailability.updateOne(
+            { _id: avail._id },
+            { $set: { endTime: slot.startTime } }
+          );
+        }
+        // Si la plage à supprimer est au milieu
+        else {
+          // Créer deux nouvelles plages
+          await TeacherAvailability.create([
+            {
+              teacherId,
+              day: avail.day,
+              startTime: avail.startTime,
+              endTime: slot.startTime
+            },
+            {
+              teacherId,
+              day: avail.day,
+              startTime: slot.endTime,
+              endTime: avail.endTime
+            }
+          ]);
+          // Supprimer l'ancienne plage
+          await TeacherAvailability.deleteOne({ _id: avail._id });
+        }
+      }
     }
 
-    // Vérifier que les suppressions ont bien été effectuées
+    // Vérifier que les modifications ont bien été effectuées
     const remainingAvailabilities = await TeacherAvailability.find({ teacherId });
     console.log('Disponibilités restantes:', remainingAvailabilities);
 
