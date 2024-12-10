@@ -17,6 +17,8 @@ install:
 	cd $(CLIENT_DIR) && npm install @headlessui/react --save
 	@echo "Installation de framer-motion..."
 	cd $(CLIENT_DIR) && npm install framer-motion --save
+	@echo "Installation de react-icons..."
+	cd $(CLIENT_DIR) && npm install react-icons --save
 
 # Démarrage des services
 .PHONY: start

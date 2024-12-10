@@ -5,7 +5,7 @@ import TeachersList from './manager/TeachersList';
 import MessagesSection from './manager/MessagesSection';
 
 // Ajouter le composant TeacherModal
-const TeacherModal = ({ onClose, setError }) => {
+const TeacherModal = ({ onClose, setError, isDarkMode }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -99,13 +99,15 @@ const TeacherModal = ({ onClose, setError }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
+    <div className={`fixed inset-0 ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-200`}>
+      <div className={`bg-${isDarkMode ? 'gray-900' : 'gray-50'} ${isDarkMode ? 'text-white' : 'text-gray-900'} backdrop-blur-lg border border-${isDarkMode ? 'gray-700' : 'gray-200'} rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all`}>
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Inviter un professeur</h2>
+          <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} drop-shadow-[0_0_15px_rgba(6,182,212,0.5)]`}>
+            Inviter un professeur
+          </h2>
           <button 
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-500 transition-colors"
+            className={`text-${isDarkMode ? 'gray-300' : 'gray-500'} hover:text-${isDarkMode ? 'gray-200' : 'gray-700'} transition-colors`}
           >
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -115,47 +117,47 @@ const TeacherModal = ({ onClose, setError }) => {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
+            <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Prénom</label>
             <input
               type="text"
               value={formData.firstName}
               onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              className={`w-full px-4 py-2 border border-${isDarkMode ? 'gray-700' : 'gray-300'} rounded-lg focus:ring-2 focus:ring-${isDarkMode ? 'blue-500' : 'indigo-500'} focus:border-transparent transition-all`}
               required
               placeholder="Jean"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+            <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Nom</label>
             <input
               type="text"
               value={formData.lastName}
               onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              className={`w-full px-4 py-2 border border-${isDarkMode ? 'gray-700' : 'gray-300'} rounded-lg focus:ring-2 focus:ring-${isDarkMode ? 'blue-500' : 'indigo-500'} focus:border-transparent transition-all`}
               required
               placeholder="Dupont"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Email</label>
             <input
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              className={`w-full px-4 py-2 border border-${isDarkMode ? 'gray-700' : 'gray-300'} rounded-lg focus:ring-2 focus:ring-${isDarkMode ? 'blue-500' : 'indigo-500'} focus:border-transparent transition-all`}
               required
               placeholder="jean.dupont@example.com"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Spécialité</label>
+            <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Spécialité</label>
             <select
               value={formData.speciality}
               onChange={(e) => setFormData({ ...formData, speciality: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              className={`w-full px-4 py-2 border border-${isDarkMode ? 'gray-700' : 'gray-300'} rounded-lg focus:ring-2 focus:ring-${isDarkMode ? 'blue-500' : 'indigo-500'} focus:border-transparent transition-all`}
             >
               <option value="mathematics">Mathématiques</option>
               <option value="physics">Physique</option>
@@ -166,7 +168,7 @@ const TeacherModal = ({ onClose, setError }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Niveaux d'enseignement</label>
+            <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Niveaux d'enseignement</label>
             <div className="grid grid-cols-2 gap-4">
               {[
                 { id: 'college', label: 'Collège' },
@@ -174,7 +176,7 @@ const TeacherModal = ({ onClose, setError }) => {
                 { id: 'superieur', label: 'Supérieur' },
                 { id: 'adulte', label: 'Adulte' }
               ].map(({ id, label }) => (
-                <label key={id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                <label key={id} className={`flex items-center space-x-3 p-3 border rounded-lg hover:bg-${isDarkMode ? 'gray-700' : 'gray-100'} cursor-pointer transition-colors`}>
                   <input
                     type="checkbox"
                     checked={formData.level.includes(id)}
@@ -184,9 +186,9 @@ const TeacherModal = ({ onClose, setError }) => {
                         : formData.level.filter(l => l !== id);
                       setFormData({ ...formData, level: newLevels });
                     }}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded transition-colors"
+                    className={`h-4 w-4 text-${isDarkMode ? 'blue-500' : 'indigo-600'} focus:ring-2 focus:ring-${isDarkMode ? 'blue-500' : 'indigo-500'} border-${isDarkMode ? 'gray-700' : 'gray-300'} rounded transition-colors`}
                   />
-                  <span className="text-sm text-gray-700">{label}</span>
+                  <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{label}</span>
                 </label>
               ))}
             </div>
@@ -196,16 +198,15 @@ const TeacherModal = ({ onClose, setError }) => {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              className={`px-4 py-2 border border-${isDarkMode ? 'gray-700' : 'gray-300'} rounded-lg ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} hover:bg-${isDarkMode ? 'gray-700' : 'gray-100'} transition-colors`}
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className={`
-                px-4 py-2 bg-indigo-600 text-white rounded-lg
-                hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500
+              className={`px-4 py-2 ${isDarkMode ? 'bg-blue-600' : 'bg-indigo-600'} text-white rounded-lg
+                hover:${isDarkMode ? 'bg-blue-700' : 'bg-indigo-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${isDarkMode ? 'blue-500' : 'indigo-500'}
                 transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
               `}
             >
@@ -233,6 +234,7 @@ const ManagerDashboard = () => {
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [error, setError] = useState('');
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Vérification de l'authentification
   React.useEffect(() => {
@@ -301,24 +303,58 @@ const ManagerDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Navbar */}
-      <nav className="bg-white shadow-sm">
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-200`}>
+      {/* Navbar moderne */}
+      <nav className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} transition-colors duration-200`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
-                <span className="text-2xl font-bold text-indigo-600">CyberMathIA</span>
+                <span className={`text-2xl font-bold ${
+                  isDarkMode 
+                    ? 'bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-500'
+                    : 'bg-gradient-to-r from-blue-600 via-cyan-600 to-purple-600'
+                } bg-clip-text text-transparent drop-shadow-sm`}>
+                  CyberMathIA
+                </span>
               </div>
             </div>
-            <div className="flex items-center">
-              <span className="text-gray-700 mr-4">
-                {user?.firstName} {user?.lastName}
-              </span>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                className={`p-2 rounded-lg ${isDarkMode ? 'bg-gray-700 text-yellow-300' : 'bg-gray-100 text-gray-500'} hover:opacity-80 transition-all duration-200`}
+              >
+                {isDarkMode ? (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  </svg>
+                )}
+              </button>
+              <div className="flex items-center space-x-3">
+                <div className={`h-8 w-8 rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} flex items-center justify-center`}>
+                  <svg className={`h-5 w-5 ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  {user?.firstName} {user?.lastName}
+                </span>
+              </div>
               <button
                 onClick={handleLogout}
-                className="text-gray-500 hover:text-gray-700"
+                className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ${
+                  isDarkMode 
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                } transition-colors duration-200`}
               >
+                <svg className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
                 Déconnexion
               </button>
             </div>
@@ -326,13 +362,17 @@ const ManagerDashboard = () => {
         </div>
       </nav>
 
-      <div className="flex">
-        {/* Sidebar */}
-        <div className="w-64 bg-white h-[calc(100vh-4rem)] shadow-sm">
+      <div className="flex h-[calc(100vh-4rem)]">
+        {/* Sidebar moderne */}
+        <div className={`w-64 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border-r ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} transition-colors duration-200`}>
           <div className="p-4">
             <button
               onClick={() => setShowTeacherModal(true)}
-              className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+              className={`w-full flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-medium ${
+                isDarkMode
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              } transition-colors duration-200 shadow-sm`}
             >
               <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
@@ -341,16 +381,20 @@ const ManagerDashboard = () => {
             </button>
           </div>
 
-          <nav className="mt-4">
+          <nav className="mt-4 px-2">
             <button
               onClick={() => {
                 setActiveSection('teachers');
                 setSelectedTeacher(null);
               }}
-              className={`w-full flex items-center px-4 py-2 text-sm font-medium ${
+              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 ${
                 activeSection === 'teachers'
-                  ? 'bg-indigo-50 text-indigo-600'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? isDarkMode
+                    ? 'bg-gray-700 text-white'
+                    : 'bg-blue-50 text-blue-700'
+                  : isDarkMode
+                    ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                    : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
               }`}
             >
               <svg className="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -363,10 +407,14 @@ const ManagerDashboard = () => {
                 setActiveSection('messages');
                 setSelectedTeacher(null);
               }}
-              className={`w-full flex items-center px-4 py-2 text-sm font-medium ${
+              className={`w-full mt-2 flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 ${
                 activeSection === 'messages'
-                  ? 'bg-indigo-50 text-indigo-600'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? isDarkMode
+                    ? 'bg-gray-700 text-white'
+                    : 'bg-blue-50 text-blue-700'
+                  : isDarkMode
+                    ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                    : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
               }`}
             >
               <svg className="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -378,20 +426,25 @@ const ManagerDashboard = () => {
         </div>
 
         {/* Contenu principal */}
-        <div className="flex-1 p-8">
-          {activeSection === 'teachers' && (
-            <TeachersList onTeacherClick={handleTeacherClick} />
-          )}
-          {activeSection === 'teacherDetails' && <TeacherDetails />}
-          {activeSection === 'messages' && <MessagesSection />}
+        <div className={`flex-1 overflow-auto ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-200`}>
+          <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <div className="animate-fadeIn">
+              {activeSection === 'teachers' && (
+                <TeachersList onTeacherClick={handleTeacherClick} isDarkMode={isDarkMode} />
+              )}
+              {activeSection === 'teacherDetails' && <TeacherDetails isDarkMode={isDarkMode} />}
+              {activeSection === 'messages' && <MessagesSection isDarkMode={isDarkMode} />}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Modal d'invitation de professeur */}
+      {/* Modal */}
       {showTeacherModal && (
         <TeacherModal
           onClose={() => setShowTeacherModal(false)}
           setError={setError}
+          isDarkMode={isDarkMode}
         />
       )}
     </div>

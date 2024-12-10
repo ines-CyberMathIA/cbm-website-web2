@@ -5,6 +5,7 @@ import User from '../models/User.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import PendingManager from '../models/PendingManager.js';
 import PendingTeacher from '../models/PendingTeacher.js';
+import MessageChannel from '../models/MessageChannel.js';
 
 const router = express.Router();
 
@@ -268,6 +269,12 @@ router.post('/complete-teacher-registration', async (req, res) => {
       id: savedTeacher._id,
       email: savedTeacher.email,
       level: savedTeacher.level
+    });
+
+    // Créer le canal de message avec le manager
+    await MessageChannel.create({
+      manager: pendingTeacher.managerId,
+      teacher: savedTeacher._id
     });
 
     // Générer le token de connexion

@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 const messageSchema = new mongoose.Schema({
+  channel: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'MessageChannel',
+    required: true
+  },
   sender: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -21,4 +26,7 @@ const messageSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-export default mongoose.model('Message', messageSchema); 
+// Index pour rechercher rapidement les messages d'un canal
+messageSchema.index({ channel: 1, createdAt: -1 });
+
+export default mongoose.model('Message', messageSchema);

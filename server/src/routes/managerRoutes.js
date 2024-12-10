@@ -6,6 +6,7 @@ import nodemailer from 'nodemailer';
 import PendingTeacher from '../models/PendingTeacher.js';
 import TeacherAvailability from '../models/TeacherAvailability.js';
 import Message from '../models/Message.js';
+import MessageChannel from '../models/MessageChannel.js';
 import managerController from '../controllers/managerController.js';
 
 const router = express.Router();
@@ -59,27 +60,35 @@ router.post('/create-teacher', authMiddleware, async (req, res) => {
 // Route pour récupérer les professeurs d'un manager
 router.get('/my-teachers', authMiddleware, async (req, res) => {
   try {
-    console.log('Recherche des professeurs pour le manager:', { managerId: req.user.userId });
+    const managerId = req.user.userId;
+    console.log('Recherche des professeurs pour le manager:', { managerId });
     
     // Récupérer les professeurs actifs
     const activeTeachers = await User.find({
       role: 'teacher',
-      createdBy: req.user.userId
+      createdBy: managerId
     }).select('-password');
     
-    console.log('Professeurs actifs trouvés:', { count: activeTeachers.length, teachers: activeTeachers });
+    console.log('Professeurs actifs trouvés:', { count: activeTeachers.length });
 
     // Récupérer les invitations en attente
     const pendingTeachers = await PendingTeacher.find({
-      managerId: req.user.userId
+      managerId: managerId
     });
 
-    console.log('Invitations en attente trouvées:', { count: pendingTeachers.length, pending: pendingTeachers });
+    console.log('Invitations en attente trouvées:', { count: pendingTeachers.length });
 
     // Combiner les résultats
     const allTeachers = [
-      ...activeTeachers.map(t => ({ ...t.toObject(), status: 'active' })),
-      ...pendingTeachers.map(t => ({ ...t.toObject(), status: 'pending' }))
+      ...activeTeachers.map(t => ({ 
+        ...t.toObject(), 
+        status: 'active',
+        speciality: t.speciality // On garde speciality cohérent
+      })),
+      ...pendingTeachers.map(t => ({ 
+        ...t.toObject(), 
+        status: 'pending' 
+      }))
     ];
 
     console.log('Liste finale des professeurs:', {
@@ -91,7 +100,11 @@ router.get('/my-teachers', authMiddleware, async (req, res) => {
     res.json(allTeachers);
   } catch (error) {
     console.error('Erreur lors de la récupération des professeurs:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ 
+      message: 'Erreur serveur lors de la récupération des professeurs',
+      error: error.message 
+    });
   }
 });
 
@@ -136,45 +149,50 @@ router.get('/teacher/:teacherId/availabilities', authMiddleware, async (req, res
   }
 });
 
-// Récupérer les messages avec un professeur
+// Route pour récupérer les messages entre un manager et un professeur
 router.get('/messages/:teacherId', authMiddleware, async (req, res) => {
   try {
     const { teacherId } = req.params;
     const messages = await Message.find({
       $or: [
-        { sender: req.user._id, receiver: teacherId },
-        { sender: teacherId, receiver: req.user._id }
+        { sender: req.user.userId, receiver: teacherId },
+        { sender: teacherId, receiver: req.user.userId }
       ]
     })
     .sort({ createdAt: 1 })
-    .populate('sender', 'firstName lastName role');
+    .populate('sender', 'firstName lastName email role')
+    .populate('receiver', 'firstName lastName email role');
 
     res.json(messages);
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la récupération des messages' });
+    console.error('Erreur lors de la récupération des messages:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 });
 
-// Envoyer un message à un professeur
+// Route pour envoyer un message à un professeur
 router.post('/messages/:teacherId', authMiddleware, async (req, res) => {
   try {
     const { teacherId } = req.params;
     const { content } = req.body;
 
-    const message = new Message({
-      sender: req.user._id,
+    const newMessage = new Message({
+      sender: req.user.userId,
       receiver: teacherId,
-      content
+      content: content
     });
 
-    await message.save();
-    
-    const populatedMessage = await Message.findById(message._id)
-      .populate('sender', 'firstName lastName role');
+    await newMessage.save();
+
+    // Charger le message avec les informations complètes des utilisateurs
+    const populatedMessage = await Message.findById(newMessage._id)
+      .populate('sender', 'firstName lastName email role')
+      .populate('receiver', 'firstName lastName email role');
 
     res.status(201).json(populatedMessage);
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de l\'envoi du message' });
+    console.error('Erreur lors de l\'envoi du message:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 });
 
@@ -368,6 +386,136 @@ router.delete('/cancel-invitation/:teacherId', authMiddleware, async (req, res) 
       message: 'Erreur lors de l\'annulation de l\'invitation',
       details: error.message
     });
+  }
+});
+
+// Route pour récupérer tous les canaux de messages
+router.get('/message-channels', authMiddleware, async (req, res) => {
+  try {
+    const channels = await MessageChannel.find({ manager: req.user.userId })
+      .populate('teacher', 'firstName lastName email speciality')
+      .sort({ updatedAt: -1 });
+
+    res.json(channels);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des canaux:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Route pour créer ou récupérer un canal de discussion
+router.post('/message-channels/:teacherId', authMiddleware, async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    
+    // Vérifier si le canal existe déjà
+    let channel = await MessageChannel.findOne({
+      manager: req.user.userId,
+      teacher: teacherId
+    });
+
+    // Si le canal n'existe pas, le créer
+    if (!channel) {
+      channel = await MessageChannel.create({
+        manager: req.user.userId,
+        teacher: teacherId
+      });
+    }
+
+    // Peupler les informations de l'enseignant
+    await channel.populate('teacher', 'firstName lastName email speciality');
+
+    res.json(channel);
+  } catch (error) {
+    console.error('Erreur lors de la création du canal:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Route pour récupérer les messages d'un canal
+router.get('/channels/:channelId/messages', authMiddleware, async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    
+    // Vérifier que le canal appartient au manager
+    const channel = await MessageChannel.findOne({
+      _id: channelId,
+      manager: req.user.userId
+    });
+
+    if (!channel) {
+      return res.status(404).json({ message: 'Canal non trouvé' });
+    }
+
+    const messages = await Message.find({ channel: channelId })
+      .populate('sender', 'firstName lastName role')
+      .sort({ createdAt: 1 });
+
+    // Marquer les messages comme lus
+    if (messages.length > 0) {
+      await Message.updateMany(
+        {
+          channel: channelId,
+          receiver: req.user.userId,
+          read: false
+        },
+        { read: true }
+      );
+
+      // Mettre à jour le compteur de messages non lus
+      await MessageChannel.updateOne(
+        { _id: channelId },
+        { 'unreadCount.manager': 0 }
+      );
+    }
+
+    res.json(messages);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des messages:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Route pour envoyer un message dans un canal
+router.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    const { content } = req.body;
+
+    // Vérifier que le canal appartient au manager
+    const channel = await MessageChannel.findOne({
+      _id: channelId,
+      manager: req.user.userId
+    });
+
+    if (!channel) {
+      return res.status(404).json({ message: 'Canal non trouvé' });
+    }
+
+    // Créer le message
+    const message = await Message.create({
+      channel: channelId,
+      sender: req.user.userId,
+      receiver: channel.teacher,
+      content
+    });
+
+    // Mettre à jour le canal
+    await MessageChannel.updateOne(
+      { _id: channelId },
+      {
+        lastMessage: new Date(),
+        $inc: { 'unreadCount.teacher': 1 }
+      }
+    );
+
+    // Peupler les informations de l'expéditeur
+    await message.populate('sender', 'firstName lastName role');
+
+    res.status(201).json(message);
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi du message:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 });
 

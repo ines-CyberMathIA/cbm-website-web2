@@ -2,6 +2,7 @@ import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import PendingTeacher from '../models/PendingTeacher.js';
+import MessageChannel from '../models/MessageChannel.js';
 
 // Configuration du transporteur email avec les bonnes informations
 const transporter = nodemailer.createTransport({
@@ -58,6 +59,21 @@ const managerController = {
       // Vérifier si l'email existe déjà comme utilisateur
       const existingUser = await User.findOne({ email });
       if (existingUser) {
+        // Si l'utilisateur existe déjà, créer un canal de message s'il n'existe pas
+        if (existingUser.role === 'teacher') {
+          const existingChannel = await MessageChannel.findOne({
+            manager: managerId,
+            teacher: existingUser._id
+          });
+
+          if (!existingChannel) {
+            await MessageChannel.create({
+              manager: managerId,
+              teacher: existingUser._id
+            });
+          }
+        }
+        
         return res.status(400).json({ 
           message: 'Cet email est déjà utilisé par un utilisateur existant',
           type: 'EMAIL_EXISTS'
