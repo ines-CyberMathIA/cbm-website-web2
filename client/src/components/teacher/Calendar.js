@@ -15,6 +15,7 @@ const Calendar = ({ isDarkMode }) => {
   const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [selectionType, setSelectionType] = useState('single');
+  const [notification, setNotification] = useState({ message: '', type: '' });
 
   useEffect(() => {
     console.log('Mode actuel:', mode);
@@ -496,7 +497,7 @@ const Calendar = ({ isDarkMode }) => {
     return minutes2 - minutes1 === 30;
   };
 
-  const validateTimeSlots = (slots) => {
+  const validateTimeSlots = (slots, isDelete = false) => {
     // Combiner les créneaux sélectionnés avec les disponibilités existantes
     const allSlots = [...slots];
     
@@ -505,10 +506,18 @@ const Calendar = ({ isDarkMode }) => {
       if (slot.startTime && slot.endTime) {
         let currentTime = slot.startTime;
         while (currentTime < slot.endTime) {
-          allSlots.push({
-            day: slot.day,
-            time: currentTime
-          });
+          // En mode suppression, on exclut les créneaux à supprimer
+          if (isDelete && !slots.some(s => s.day === slot.day && s.time === currentTime)) {
+            allSlots.push({
+              day: slot.day,
+              time: currentTime
+            });
+          } else if (!isDelete) {
+            allSlots.push({
+              day: slot.day,
+              time: currentTime
+            });
+          }
           currentTime = addMinutes(currentTime, 30);
         }
       }
@@ -553,6 +562,11 @@ const Calendar = ({ isDarkMode }) => {
           } else {
             // Si le groupe précédent est trop petit, retourner false
             if (currentGroup.length < 3) {
+              setNotification({
+                message: 'Les plages horaires doivent être plus grandes que 1h30',
+                type: 'error'
+              });
+              setTimeout(() => setNotification({ message: '', type: '' }), 3000);
               return false;
             }
             // Commencer un nouveau groupe
@@ -563,6 +577,11 @@ const Calendar = ({ isDarkMode }) => {
 
       // Vérifier le dernier groupe
       if (currentGroup.length < 3) {
+        setNotification({
+          message: 'Les plages horaires doivent être plus grandes que 1h30',
+          type: 'error'
+        });
+        setTimeout(() => setNotification({ message: '', type: '' }), 3000);
         return false;
       }
     }
@@ -604,8 +623,8 @@ const Calendar = ({ isDarkMode }) => {
         
         // Envoyer une requête POST pour ajouter les nouvelles disponibilités
         const saveResponse = await axios.post(
-          `${config.API_URL}/api/teacher/availabilities/add`,  // Notez le changement d'URL
-          { newAvailabilities: newRanges },  // Renommé pour plus de clarté
+          `${config.API_URL}/api/teacher/availabilities/add`,
+          { newAvailabilities: newRanges },
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -639,7 +658,17 @@ const Calendar = ({ isDarkMode }) => {
           }, 2000);
         }
       } else if (mode === 'delete' && unsavedAvailabilities.length > 0) {
-        // Ajouter la logique de suppression ici si nécessaire
+        // Vérifier que les plages horaires restantes seront valides après suppression
+        if (!validateTimeSlots(unsavedAvailabilities, true)) {
+          setError('La suppression créerait des plages horaires inférieures à 1h30');
+          setSaveStatus('error');
+          setTimeout(() => {
+            setError(null);
+            setSaveStatus('');
+          }, 3000);
+          return;
+        }
+
         const slotsToDelete = convertSlotsToRanges(unsavedAvailabilities);
         
         const deleteResponse = await axios.post(
@@ -669,6 +698,11 @@ const Calendar = ({ isDarkMode }) => {
           setUnsavedAvailabilities([]);
           setSaveStatus('saved');
           setMode('view');
+          
+          setTimeout(() => {
+            setSaveStatus('');
+            setError(null);
+          }, 2000);
         }
       }
     } catch (error) {
@@ -795,8 +829,8 @@ const Calendar = ({ isDarkMode }) => {
       shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]
     `;
 
-    // Si on est en mode ajout avec un type de sélection, afficher les boutons de sauvegarde/annulation
-    if (mode === 'add' && selectionType) {
+    // Si on est en mode ajout avec un type de sélection ou en mode suppression, afficher les boutons de sauvegarde/annulation
+    if ((mode === 'add' && selectionType) || mode === 'delete') {
       return (
         <div className="flex flex-col space-y-3">
           <motion.button
@@ -824,6 +858,7 @@ const Calendar = ({ isDarkMode }) => {
               setMode('view');
               setSelectionType(null);
               setSelectedSlots([]);
+              setUnsavedAvailabilities([]);
               setIsAddMenuOpen(false);
             }}
             className={`
@@ -953,6 +988,25 @@ const Calendar = ({ isDarkMode }) => {
 
   return (
     <div className="w-full h-[calc(100vh-6rem)] p-2 sm:p-4 mb-8">
+      {/* Notification */}
+      {notification.message && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
+            notification.type === 'error'
+              ? isDarkMode
+                ? 'bg-red-900/90 text-red-100'
+                : 'bg-red-100 text-red-800'
+              : isDarkMode
+                ? 'bg-green-900/90 text-green-100'
+                : 'bg-green-100 text-green-800'
+          }`}
+        >
+          {notification.message}
+        </motion.div>
+      )}
       <div className={`flex rounded-2xl shadow-lg overflow-hidden h-full ${
         isDarkMode 
           ? 'bg-gray-800 border border-gray-700' 
@@ -1075,25 +1129,25 @@ const Calendar = ({ isDarkMode }) => {
                 <div className={`absolute right-0 mt-2 w-40 rounded-md shadow-lg ${
                   isDarkMode ? 'bg-gray-800' : 'bg-white'
                 } ring-1 ring-black ring-opacity-5 z-50`}>
-                  <div className="py-1" role="menu">
-                    {['day', 'week', 'month'].map((mode) => (
-                      <button
-                        key={mode}
-                        onClick={() => {
-                          setViewMode(mode);
-                          setIsViewMenuOpen(false);
-                        }}
-                        className={`block w-full text-left px-4 py-2 text-sm ${
-                          isDarkMode
-                            ? 'text-gray-200 hover:bg-gray-700'
-                            : 'text-gray-700 hover:bg-gray-100'
-                        } ${viewMode === mode ? 'font-medium' : ''}`}
-                      >
-                        {mode === 'day' ? 'Jour' : mode === 'week' ? 'Semaine' : 'Mois'}
-                      </button>
-                    ))}
-                  </div>
+                <div className="py-1" role="menu">
+                  {['day', 'week', 'month'].map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => {
+                        setViewMode(mode);
+                        setIsViewMenuOpen(false);
+                      }}
+                      className={`block w-full text-left px-4 py-2 text-sm ${
+                        isDarkMode
+                          ? 'text-gray-200 hover:bg-gray-700'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      } ${viewMode === mode ? 'font-medium' : ''}`}
+                    >
+                      {mode === 'day' ? 'Jour' : mode === 'week' ? 'Semaine' : 'Mois'}
+                    </button>
+                  ))}
                 </div>
+              </div>
               )}
             </div>
           </div>
