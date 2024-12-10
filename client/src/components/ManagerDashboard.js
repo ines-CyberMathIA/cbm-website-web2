@@ -99,129 +99,223 @@ const TeacherModal = ({ onClose, setError, isDarkMode }) => {
   };
 
   return (
-    <div className={`fixed inset-0 ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-200`}>
-      <div className={`bg-${isDarkMode ? 'gray-900' : 'gray-50'} ${isDarkMode ? 'text-white' : 'text-gray-900'} backdrop-blur-lg border border-${isDarkMode ? 'gray-700' : 'gray-200'} rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all`}>
-        <div className="flex justify-between items-center mb-6">
-          <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} drop-shadow-[0_0_15px_rgba(6,182,212,0.5)]`}>
-            Inviter un professeur
-          </h2>
-          <button 
-            onClick={onClose}
-            className={`text-${isDarkMode ? 'gray-300' : 'gray-500'} hover:text-${isDarkMode ? 'gray-200' : 'gray-700'} transition-colors`}
-          >
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Prénom</label>
-            <input
-              type="text"
-              value={formData.firstName}
-              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-              className={`w-full px-4 py-2 border border-${isDarkMode ? 'gray-700' : 'gray-300'} rounded-lg focus:ring-2 focus:ring-${isDarkMode ? 'blue-500' : 'indigo-500'} focus:border-transparent transition-all`}
-              required
-              placeholder="Jean"
-            />
-          </div>
-
-          <div>
-            <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Nom</label>
-            <input
-              type="text"
-              value={formData.lastName}
-              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-              className={`w-full px-4 py-2 border border-${isDarkMode ? 'gray-700' : 'gray-300'} rounded-lg focus:ring-2 focus:ring-${isDarkMode ? 'blue-500' : 'indigo-500'} focus:border-transparent transition-all`}
-              required
-              placeholder="Dupont"
-            />
-          </div>
-
-          <div>
-            <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Email</label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className={`w-full px-4 py-2 border border-${isDarkMode ? 'gray-700' : 'gray-300'} rounded-lg focus:ring-2 focus:ring-${isDarkMode ? 'blue-500' : 'indigo-500'} focus:border-transparent transition-all`}
-              required
-              placeholder="jean.dupont@example.com"
-            />
-          </div>
-
-          <div>
-            <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Spécialité</label>
-            <select
-              value={formData.speciality}
-              onChange={(e) => setFormData({ ...formData, speciality: e.target.value })}
-              className={`w-full px-4 py-2 border border-${isDarkMode ? 'gray-700' : 'gray-300'} rounded-lg focus:ring-2 focus:ring-${isDarkMode ? 'blue-500' : 'indigo-500'} focus:border-transparent transition-all`}
-            >
-              <option value="mathematics">Mathématiques</option>
-              <option value="physics">Physique</option>
-              <option value="chemistry">Chimie</option>
-              <option value="biology">Biologie</option>
-              <option value="computer_science">Informatique</option>
-            </select>
-          </div>
-
-          <div>
-            <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Niveaux d'enseignement</label>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { id: 'college', label: 'Collège' },
-                { id: 'lycee', label: 'Lycée' },
-                { id: 'superieur', label: 'Supérieur' },
-                { id: 'adulte', label: 'Adulte' }
-              ].map(({ id, label }) => (
-                <label key={id} className={`flex items-center space-x-3 p-3 border rounded-lg hover:bg-${isDarkMode ? 'gray-700' : 'gray-100'} cursor-pointer transition-colors`}>
-                  <input
-                    type="checkbox"
-                    checked={formData.level.includes(id)}
-                    onChange={(e) => {
-                      const newLevels = e.target.checked
-                        ? [...formData.level, id]
-                        : formData.level.filter(l => l !== id);
-                      setFormData({ ...formData, level: newLevels });
-                    }}
-                    className={`h-4 w-4 text-${isDarkMode ? 'blue-500' : 'indigo-600'} focus:ring-2 focus:ring-${isDarkMode ? 'blue-500' : 'indigo-500'} border-${isDarkMode ? 'gray-700' : 'gray-300'} rounded transition-colors`}
-                  />
-                  <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-end space-x-3 mt-8">
-            <button
-              type="button"
+    <div 
+      className={`fixed inset-0 z-50 overflow-y-auto`}
+      aria-labelledby="modal-title"
+      role="dialog"
+      aria-modal="true"
+    >
+      {/* Overlay avec effet de flou */}
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm transition-opacity"
+        aria-hidden="true"
+        onClick={onClose}
+      />
+      
+      {/* Container pour centrer la modale */}
+      <div className="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+        {/* Modale */}
+        <div 
+          className={`
+            relative transform overflow-hidden rounded-2xl 
+            ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}
+            border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}
+            p-8 text-left shadow-xl transition-all
+            w-full max-w-md
+            animate-modal-appear
+          `}
+        >
+          {/* En-tête */}
+          <div className="flex justify-between items-center mb-6">
+            <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} drop-shadow-[0_0_15px_rgba(6,182,212,0.5)]`}>
+              Inviter un professeur
+            </h2>
+            <button 
               onClick={onClose}
-              className={`px-4 py-2 border border-${isDarkMode ? 'gray-700' : 'gray-300'} rounded-lg ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} hover:bg-${isDarkMode ? 'gray-700' : 'gray-100'} transition-colors`}
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={`px-4 py-2 ${isDarkMode ? 'bg-blue-600' : 'bg-indigo-600'} text-white rounded-lg
-                hover:${isDarkMode ? 'bg-blue-700' : 'bg-indigo-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${isDarkMode ? 'blue-500' : 'indigo-500'}
-                transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+              className={`
+                rounded-full p-1.5
+                text-gray-400 hover:text-gray-500
+                focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500
+                transition-colors duration-200
               `}
             >
-              {isLoading ? (
-                <div className="flex items-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Envoi en cours...
-                </div>
-              ) : 'Inviter'}
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
-        </form>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                Prénom
+              </label>
+              <input
+                type="text"
+                value={formData.firstName}
+                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                className={`
+                  w-full px-4 py-2.5
+                  ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}
+                  rounded-lg
+                  focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+                  transition-all duration-200
+                  placeholder-gray-400
+                `}
+                required
+                placeholder="Jean"
+              />
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                Nom
+              </label>
+              <input
+                type="text"
+                value={formData.lastName}
+                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                className={`
+                  w-full px-4 py-2.5
+                  ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}
+                  rounded-lg
+                  focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+                  transition-all duration-200
+                  placeholder-gray-400
+                `}
+                required
+                placeholder="Dupont"
+              />
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                Email
+              </label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className={`
+                  w-full px-4 py-2.5
+                  ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}
+                  rounded-lg
+                  focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+                  transition-all duration-200
+                  placeholder-gray-400
+                `}
+                required
+                placeholder="jean.dupont@example.com"
+              />
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                Spécialité
+              </label>
+              <select
+                value={formData.speciality}
+                onChange={(e) => setFormData({ ...formData, speciality: e.target.value })}
+                className={`
+                  w-full px-4 py-2.5
+                  ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}
+                  rounded-lg
+                  focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+                  transition-all duration-200
+                `}
+              >
+                <option value="mathematics">Mathématiques</option>
+                <option value="physics">Physique</option>
+                <option value="chemistry">Chimie</option>
+                <option value="biology">Biologie</option>
+                <option value="computer_science">Informatique</option>
+              </select>
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                Niveaux d'enseignement
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { id: 'college', label: 'Collège' },
+                  { id: 'lycee', label: 'Lycée' },
+                  { id: 'superieur', label: 'Supérieur' },
+                  { id: 'adulte', label: 'Adulte' }
+                ].map(({ id, label }) => (
+                  <label
+                    key={id}
+                    className={`
+                      flex items-center space-x-2 p-3
+                      ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-50 hover:bg-gray-100'}
+                      border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}
+                      rounded-lg cursor-pointer
+                      transition-colors duration-200
+                    `}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formData.level.includes(id)}
+                      onChange={(e) => {
+                        const newLevel = e.target.checked
+                          ? [...formData.level, id]
+                          : formData.level.filter(l => l !== id);
+                        setFormData({ ...formData, level: newLevel });
+                      }}
+                      className="
+                        h-4 w-4 text-indigo-600
+                        focus:ring-indigo-500 border-gray-300
+                        rounded transition-colors duration-200
+                      "
+                    />
+                    <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      {label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-8 flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className={`
+                  px-4 py-2 rounded-lg
+                  ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'}
+                  text-sm font-medium
+                  transition-colors duration-200
+                `}
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className={`
+                  px-4 py-2 rounded-lg
+                  bg-indigo-600 hover:bg-indigo-700
+                  text-white text-sm font-medium
+                  transition-colors duration-200
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  flex items-center space-x-2
+                `}
+              >
+                {isLoading ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Envoi en cours...</span>
+                  </>
+                ) : (
+                  <span>Envoyer l'invitation</span>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
-const HeroSection = ({ isDarkMode }) => {
+const HeroSection = ({ darkMode }) => {
   const textVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: (custom) => ({
@@ -31,24 +31,24 @@ const HeroSection = ({ isDarkMode }) => {
     }
   };
 
-  const colors = isDarkMode ? darkColors : lightColors;
+  const colors = darkMode ? darkColors : lightColors;
 
   useEffect(() => {
-    document.body.style.backgroundColor = isDarkMode ? '#0a0b0f' : '#ffffff';
-  }, [isDarkMode]);
+    document.body.style.backgroundColor = darkMode ? '#0a0b0f' : '#ffffff';
+  }, [darkMode]);
 
   return (
-    <div className={`relative min-h-screen w-full overflow-hidden ${isDarkMode ? 'bg-[#0a0b0f]' : 'bg-white'}`}>
+    <div className={`relative min-h-screen w-full overflow-hidden ${darkMode ? 'bg-[#0a0b0f]' : 'bg-white'}`}>
       {/* Fond avec transition */}
-      <div className={`absolute inset-0 bg-gradient-to-br ${isDarkMode ? 'from-[#1a1b2e] via-[#16181f] to-[#0a0b0f]' : 'from-[#ffffff] via-[#f5f7ff] to-[#eef0ff]'} transition-colors duration-500`}>
-        <div className={`absolute inset-0 bg-gradient-to-tr ${isDarkMode ? 'from-[#2d3154]/40' : 'from-[#e0e4ff]/40'} via-transparent ${isDarkMode ? 'to-[#384878]/30' : 'to-[#b8c3ff]/30'} clip-diagonal transition-colors duration-500`}></div>
+      <div className={`absolute inset-0 bg-gradient-to-br ${darkMode ? 'from-[#1a1b2e] via-[#16181f] to-[#0a0b0f]' : 'from-[#ffffff] via-[#f5f7ff] to-[#eef0ff]'} transition-colors duration-500`}>
+        <div className={`absolute inset-0 bg-gradient-to-tr ${darkMode ? 'from-[#2d3154]/40' : 'from-[#e0e4ff]/40'} via-transparent ${darkMode ? 'to-[#384878]/30' : 'to-[#b8c3ff]/30'} clip-diagonal transition-colors duration-500`}></div>
       </div>
 
       {/* Formes cyberpunk en arrière-plan */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Étoiles scintillantes */}
         <div className="absolute top-0 left-0 w-full h-full">
-          {isDarkMode ? (
+          {darkMode ? (
             [...Array(70)].map((_, i) => (
               <motion.div
                 key={i}
@@ -61,7 +61,7 @@ const HeroSection = ({ isDarkMode }) => {
                   ease: "easeInOut"
                 }}
                 className={`absolute w-1 h-1 ${
-                  isDarkMode ? 'bg-white' : 'bg-gray-800'
+                  darkMode ? 'bg-white' : 'bg-gray-800'
                 }`}
                 style={{
                   left: `${Math.random() * 100}%`,
@@ -105,7 +105,7 @@ const HeroSection = ({ isDarkMode }) => {
         {/* Formes géométriques cyberpunk */}
         <motion.div
           className={`absolute top-20 right-20 w-40 h-40 ${
-            isDarkMode 
+            darkMode 
               ? 'border-cyan-500 border-2 opacity-20' 
               : 'bg-gradient-to-br from-blue-300/30 to-cyan-300/30'
           }`}
@@ -119,7 +119,7 @@ const HeroSection = ({ isDarkMode }) => {
 
         <motion.div
           className={`absolute bottom-40 left-20 w-60 h-60 ${
-            isDarkMode 
+            darkMode 
               ? 'border-purple-500 border-2 opacity-20'
               : 'bg-gradient-to-br from-purple-300/30 to-pink-300/30'
           }`}
@@ -132,7 +132,7 @@ const HeroSection = ({ isDarkMode }) => {
         />
 
         {/* Lignes angulaires animées */}
-        {isDarkMode ? (
+        {darkMode ? (
           <svg className="absolute inset-0 w-full h-full" style={{ opacity: 0.1 }}>
             <motion.path
               d={`M0,100 L${window.innerWidth},${window.innerHeight/2}`}
@@ -183,7 +183,7 @@ const HeroSection = ({ isDarkMode }) => {
           <motion.div
             key={`hex-${i}`}
             className={`absolute w-32 h-32 ${
-              isDarkMode 
+              darkMode 
                 ? 'border-pink-500 border opacity-10'
                 : 'bg-gradient-to-br from-indigo-300/20 to-purple-300/20'
             }`}
@@ -224,7 +224,7 @@ const HeroSection = ({ isDarkMode }) => {
           className="text-center px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto -mt-16"
         >
           <h1 className={`text-6xl sm:text-7xl md:text-8xl font-bold mb-16 ${
-            isDarkMode ? 'text-white' : 'text-gray-900'
+            darkMode ? 'text-white' : 'text-gray-900'
           } leading-tight`}>
             <span className="bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
               CyberMathIA
@@ -232,7 +232,7 @@ const HeroSection = ({ isDarkMode }) => {
           </h1>
           
           <h2 className={`text-xl sm:text-2xl md:text-3xl mb-16 leading-relaxed max-w-4xl mx-auto ${
-            isDarkMode ? 'text-gray-300' : 'text-gray-700'
+            darkMode ? 'text-gray-300' : 'text-gray-700'
           }`}>
             votre site de{' '}
             <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent font-medium">
@@ -254,7 +254,7 @@ const HeroSection = ({ isDarkMode }) => {
             whileTap={{ scale: 0.95 }}
           >
             <button className="group relative px-12 py-5">
-              <span className={`relative z-10 ${isDarkMode ? 'text-[#e0e4ff]' : 'text-[#2d3154]'} font-medium text-lg`}>
+              <span className={`relative z-10 ${darkMode ? 'text-[#e0e4ff]' : 'text-[#2d3154]'} font-medium text-lg`}>
                 Découvrir
               </span>
               <div className="absolute inset-0 bg-gradient-to-r from-[#6e8eff]/90 to-[#8b9eff]/90 rounded-full transform group-hover:scale-110 transition-transform duration-300"></div>

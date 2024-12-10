@@ -13,8 +13,8 @@ router.post('/channel', authMiddleware, async (req, res) => {
     // Vérifier si un canal existe déjà
     let channel = await MessageChannel.findOne({
       $or: [
-        { manager: req.user.id, teacher: receiverId },
-        { manager: receiverId, teacher: req.user.id }
+        { manager: req.user.userId, teacher: receiverId },
+        { manager: receiverId, teacher: req.user.userId }
       ]
     });
 
@@ -22,8 +22,8 @@ router.post('/channel', authMiddleware, async (req, res) => {
     if (!channel) {
       const isManager = req.user.role === 'manager';
       channel = new MessageChannel({
-        manager: isManager ? req.user.id : receiverId,
-        teacher: isManager ? receiverId : req.user.id,
+        manager: isManager ? req.user.userId : receiverId,
+        teacher: isManager ? receiverId : req.user.userId,
         lastMessage: new Date(),
         unreadCount: { manager: 0, teacher: 0 }
       });
@@ -46,7 +46,7 @@ router.get('/channel/:channelId', authMiddleware, async (req, res) => {
     }
 
     // Vérifier que l'utilisateur a accès à ce canal
-    if (channel.manager.toString() !== req.user.id && channel.teacher.toString() !== req.user.id) {
+    if (channel.manager.toString() !== req.user.userId && channel.teacher.toString() !== req.user.userId) {
       return res.status(403).json({ message: "Accès non autorisé à ce canal" });
     }
 
@@ -84,13 +84,13 @@ router.post('/send', authMiddleware, async (req, res) => {
     }
 
     // Vérifier que l'utilisateur a accès à ce canal
-    if (channel.manager.toString() !== req.user.id && channel.teacher.toString() !== req.user.id) {
+    if (channel.manager.toString() !== req.user.userId && channel.teacher.toString() !== req.user.userId) {
       return res.status(403).json({ message: "Accès non autorisé à ce canal" });
     }
 
     // Déterminer l'expéditeur et le destinataire
     const isManager = req.user.role === 'manager';
-    const senderId = req.user.id;
+    const senderId = req.user.userId;
     const receiverId = isManager ? channel.teacher : channel.manager;
 
     const message = new Message({
@@ -125,15 +125,15 @@ router.post('/send', authMiddleware, async (req, res) => {
 // Récupérer les messages entre le manager et le professeur
 router.get('/manager', authMiddleware, async (req, res) => {
   try {
-    const teacher = await User.findById(req.user.id).populate('managerId');
+    const teacher = await User.findById(req.user.userId).populate('managerId');
     if (!teacher.managerId) {
       return res.status(404).json({ message: "Aucun manager n'est assigné" });
     }
 
     const messages = await Message.find({
       $or: [
-        { senderId: req.user.id, receiverId: teacher.managerId._id },
-        { senderId: teacher.managerId._id, receiverId: req.user.id }
+        { senderId: req.user.userId, receiverId: teacher.managerId._id },
+        { senderId: teacher.managerId._id, receiverId: req.user.userId }
       ]
     }).sort({ createdAt: 1 });
 
@@ -141,7 +141,7 @@ router.get('/manager', authMiddleware, async (req, res) => {
       _id: msg._id,
       content: msg.content,
       createdAt: msg.createdAt,
-      sender: msg.senderId.equals(req.user.id) ? 'teacher' : {
+      sender: msg.senderId.equals(req.user.userId) ? 'teacher' : {
         id: teacher.managerId._id,
         role: 'manager',
         firstName: teacher.managerId.firstName,
@@ -162,7 +162,7 @@ router.post('/read/:channelId', authMiddleware, async (req, res) => {
     await Message.updateMany(
       {
         channelId: req.params.channelId,
-        receiverId: req.user.id,
+        receiverId: req.user.userId,
         read: false
       },
       { read: true }
@@ -172,27 +172,6 @@ router.post('/read/:channelId', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Erreur lors du marquage des messages comme lus:', error);
     res.status(500).json({ message: "Erreur lors du marquage des messages comme lus" });
-  }
-});
-
-// Récupérer les messages d'un canal
-router.get('/messages/channel/:channelId', authMiddleware, async (req, res) => {
-  try {
-    const messages = await Message.find({
-      channelId: req.params.channelId,
-      $or: [
-        { senderId: req.user.id },
-        { receiverId: req.user.id }
-      ]
-    })
-    .populate('senderId', 'firstName lastName role')
-    .populate('receiverId', 'firstName lastName role')
-    .sort({ createdAt: 1 });
-
-    res.json(messages);
-  } catch (error) {
-    console.error('Erreur lors de la récupération des messages:', error);
-    res.status(500).json({ message: "Erreur lors de la récupération des messages" });
   }
 });
 

@@ -149,30 +149,40 @@ router.get('/users/:role', authMiddleware, adminMiddleware, async (req, res) => 
 });
 
 // Route pour supprimer un utilisateur
-router.delete('/users/:userId', authMiddleware, adminMiddleware, async (req, res) => {
+router.delete('/users/:userId', authMiddleware, async (req, res) => {
   try {
-    const { userId } = req.params;
-    console.log('Suppression de l\'utilisateur:', userId);
+    // Vérifier que l'utilisateur est admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
 
+    const { userId } = req.params;
+    
+    // Vérifier si l'utilisateur existe
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'Utilisateur non trouvé' });
     }
 
-    // Empêcher la suppression d'un admin
-    if (user.role === 'admin') {
-      return res.status(403).json({ message: 'Impossible de supprimer un administrateur' });
+    // Si c'est un professeur, supprimer aussi ses canaux de message
+    if (user.role === 'teacher') {
+      await MessageChannel.deleteMany({ teacher: userId });
     }
 
-    await User.deleteOne({ _id: userId });
-    console.log('Utilisateur supprimé avec succès');
-    
+    // Si c'est un manager, supprimer ses canaux de message
+    if (user.role === 'manager') {
+      await MessageChannel.deleteMany({ manager: userId });
+    }
+
+    // Supprimer l'utilisateur
+    await User.findByIdAndDelete(userId);
+
     res.json({ message: 'Utilisateur supprimé avec succès' });
   } catch (error) {
     console.error('Erreur lors de la suppression de l\'utilisateur:', error);
     res.status(500).json({ 
       message: 'Erreur lors de la suppression de l\'utilisateur',
-      error: error.message 
+      error: error.message
     });
   }
 });

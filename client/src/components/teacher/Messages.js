@@ -30,14 +30,15 @@ const Messages = ({ isDarkMode }) => {
         setManagerInfo(response.data);
         
         // Créer ou récupérer le canal de discussion avec le manager
-        if (response.data) {
+        if (response.data && response.data.id) {  
           const channelResponse = await axios.post(
             'http://localhost:5000/api/messages/channel',
-            { receiverId: response.data.id },
+            { receiverId: response.data.id },  
             {
               headers: { Authorization: `Bearer ${token}` }
             }
           );
+          console.log('Channel response:', channelResponse.data);
           setActiveChannel(channelResponse.data);
         }
       } catch (error) {
@@ -61,6 +62,7 @@ const Messages = ({ isDarkMode }) => {
             headers: { Authorization: `Bearer ${token}` }
           }
         );
+        console.log('Messages received:', response.data);
         setMessages(response.data);
         scrollToBottom();
       } catch (error) {
@@ -85,6 +87,11 @@ const Messages = ({ isDarkMode }) => {
 
     try {
       const token = sessionStorage.getItem('token');
+      console.log('Sending message:', {
+        content: newMessage,
+        channelId: activeChannel._id
+      });
+      
       const response = await axios.post(
         'http://localhost:5000/api/messages/send',
         {
@@ -96,6 +103,7 @@ const Messages = ({ isDarkMode }) => {
         }
       );
 
+      console.log('Message sent:', response.data);
       setMessages([...messages, response.data]);
       setNewMessage('');
       scrollToBottom();
@@ -124,7 +132,7 @@ const Messages = ({ isDarkMode }) => {
             <div className="flex-1 overflow-y-auto">
               {managerInfo && (
                 <button
-                  onClick={() => setActiveChannel(activeChannel)}
+                  onClick={() => setActiveChannel(managerInfo)}
                   className={`w-full p-4 transition-all duration-200 ${
                     activeChannel ? 'bg-gradient-to-r from-cyan-400 to-blue-500' : ''
                   } hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}
@@ -189,10 +197,10 @@ const Messages = ({ isDarkMode }) => {
               {messages.map((message, index) => (
                 <div
                   key={message._id || index}
-                  className={`flex ${message.senderId._id === user.id ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${message.senderId._id === user.userId ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className={`max-w-[70%] ${
-                    message.senderId._id === user.id
+                    message.senderId._id === user.userId
                       ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white'
                       : isDarkMode
                         ? 'bg-gray-700 text-white'

@@ -31,7 +31,9 @@ const MessagesSection = () => {
           'http://localhost:5000/api/manager/message-channels',
           getAxiosConfig()
         );
-        setChannels(response.data);
+        // Filtrer les canaux qui ont un professeur valide
+        const validChannels = response.data.filter(channel => channel.teacher);
+        setChannels(validChannels);
       } catch (error) {
         console.error('Erreur lors du chargement des canaux:', error);
         if (error.response?.status === 401) {
@@ -171,6 +173,18 @@ const MessagesSection = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Fonction pour obtenir le nom du contact
+  const getContactName = (contact) => {
+    if (!contact) return 'Professeur supprimé';
+    return `${contact.firstName} ${contact.lastName}`;
+  };
+
+  // Fonction pour obtenir les initiales
+  const getInitials = (contact) => {
+    if (!contact) return '??';
+    return `${contact.firstName[0]}${contact.lastName[0]}`.toUpperCase();
+  };
+
   const filteredTeachers = teachers.filter(teacher =>
     teacher.status === 'active' &&
     `${teacher.firstName} ${teacher.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
@@ -237,12 +251,12 @@ const MessagesSection = () => {
                         ? 'text-indigo-400'
                         : 'text-indigo-600'
                   }`}>
-                    {channel.teacher.firstName[0]}{channel.teacher.lastName[0]}
+                    {getInitials(channel.teacher)}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className={`font-medium truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {channel.teacher.firstName} {channel.teacher.lastName}
+                    {getContactName(channel.teacher)}
                   </div>
                   <div className={`text-sm truncate ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                     {channel.teacher.speciality}
@@ -284,12 +298,12 @@ const MessagesSection = () => {
                   <span className={`text-lg font-medium ${
                     darkMode ? 'text-gray-300' : 'text-gray-600'
                   }`}>
-                    {teacher.firstName[0]}{teacher.lastName[0]}
+                    {getInitials(teacher)}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className={`font-medium truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {teacher.firstName} {teacher.lastName}
+                    {getContactName(teacher)}
                   </div>
                   <div className={`text-sm truncate ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                     {teacher.speciality}
@@ -316,12 +330,12 @@ const MessagesSection = () => {
                   <span className={`text-lg font-medium ${
                     darkMode ? 'text-white' : 'text-indigo-600'
                   }`}>
-                    {selectedChannel.teacher.firstName[0]}{selectedChannel.teacher.lastName[0]}
+                    {getInitials(selectedChannel.teacher)}
                   </span>
                 </div>
                 <div>
                   <h2 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {selectedChannel.teacher.firstName} {selectedChannel.teacher.lastName}
+                    {getContactName(selectedChannel.teacher)}
                   </h2>
                   <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                     {selectedChannel.teacher.speciality}
@@ -335,12 +349,12 @@ const MessagesSection = () => {
             {messages.map((message) => (
               <div
                 key={message._id}
-                className={`flex ${message.sender.role === 'manager' ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${message.senderId.role === 'manager' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`max-w-[70%] ${message.sender.role === 'manager' ? 'items-end' : 'items-start'}`}>
+                <div className={`max-w-[70%] ${message.senderId.role === 'manager' ? 'items-end' : 'items-start'}`}>
                   <div className="flex items-center mb-1 space-x-2">
                     <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      {message.sender.firstName} {message.sender.lastName}
+                      {getContactName(message.senderId)}
                     </span>
                     <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
                       {new Date(message.createdAt).toLocaleTimeString()}
@@ -348,7 +362,7 @@ const MessagesSection = () => {
                   </div>
                   <div
                     className={`rounded-2xl px-6 py-3 ${
-                      message.sender.role === 'manager'
+                      message.senderId.role === 'manager'
                         ? darkMode
                           ? 'bg-indigo-600 text-white'
                           : 'bg-indigo-100 text-gray-900'
@@ -360,7 +374,7 @@ const MessagesSection = () => {
                     <p className="text-sm">{message.content}</p>
                   </div>
                   <div className={`flex items-center mt-1 space-x-1 text-xs ${
-                    message.sender.role === 'manager' ? 'justify-end' : 'justify-start'
+                    message.senderId.role === 'manager' ? 'justify-end' : 'justify-start'
                   }`}>
                     {message.read ? (
                       <>
