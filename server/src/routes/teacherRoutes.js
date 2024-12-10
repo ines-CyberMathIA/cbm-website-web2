@@ -171,26 +171,58 @@ router.post('/availabilities/add', authMiddleware, async (req, res) => {
   }
 });
 
-// Supprimer des disponibilités spécifiques
+// Route pour supprimer des disponibilités
 router.post('/availabilities/delete', authMiddleware, async (req, res) => {
   try {
+    console.log('Tentative de suppression des disponibilités:', req.body);
     const { availabilitiesToDelete } = req.body;
     const teacherId = req.user.userId;
 
-    // Supprimer les disponibilités spécifiées
-    for (const availability of availabilitiesToDelete) {
-      await TeacherAvailability.deleteMany({
-        teacherId,
-        day: availability.day,
-        startTime: availability.startTime,
-        endTime: availability.endTime
-      });
+    if (!availabilitiesToDelete || !Array.isArray(availabilitiesToDelete)) {
+      return res.status(400).json({ message: 'Format de données invalide' });
     }
 
-    res.status(200).json({ message: 'Disponibilités supprimées avec succès' });
+    // Pour chaque plage horaire à supprimer
+    for (const slot of availabilitiesToDelete) {
+      console.log('Suppression de la plage horaire:', slot);
+      
+      // Trouver toutes les disponibilités qui se chevauchent avec la plage à supprimer
+      const result = await TeacherAvailability.deleteMany({
+        teacherId,
+        day: slot.day,
+        $or: [
+          // Disponibilité qui commence pendant la plage à supprimer
+          {
+            startTime: { $gte: slot.startTime },
+            endTime: { $lte: slot.endTime }
+          },
+          // Disponibilité qui contient la plage à supprimer
+          {
+            startTime: { $lte: slot.startTime },
+            endTime: { $gte: slot.endTime }
+          }
+        ]
+      });
+
+      console.log('Résultat de la suppression:', result);
+    }
+
+    // Vérifier que les suppressions ont bien été effectuées
+    const remainingAvailabilities = await TeacherAvailability.find({ teacherId });
+    console.log('Disponibilités restantes:', remainingAvailabilities);
+
+    res.json({ 
+      message: 'Disponibilités supprimées avec succès',
+      success: true,
+      remainingAvailabilities
+    });
+
   } catch (error) {
     console.error('Erreur lors de la suppression des disponibilités:', error);
-    res.status(500).json({ error: 'Erreur lors de la suppression des disponibilités' });
+    res.status(500).json({ 
+      message: 'Erreur lors de la suppression des disponibilités',
+      error: error.message 
+    });
   }
 });
 

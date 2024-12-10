@@ -451,6 +451,7 @@ const Calendar = ({ isDarkMode }) => {
   };
 
   const convertSlotsToRanges = (slots) => {
+    console.log('Slots reçus pour conversion:', slots);
     const ranges = [];
     const slotsByDay = {};
 
@@ -462,6 +463,8 @@ const Calendar = ({ isDarkMode }) => {
       slotsByDay[slot.day].add(slot.time);
     });
 
+    console.log('Slots groupés par jour:', slotsByDay);
+
     // Pour chaque jour, convertir les créneaux en plages horaires
     Object.entries(slotsByDay).forEach(([day, timesSet]) => {
       const times = Array.from(timesSet).sort();
@@ -471,21 +474,28 @@ const Calendar = ({ isDarkMode }) => {
         endTime: null
       };
 
-      times.forEach((time, index) => {
+      for (let i = 0; i < times.length; i++) {
+        const time = times[i];
+        
         if (!currentRange.startTime) {
           currentRange.startTime = time;
         }
 
         // Si c'est le dernier créneau ou si le prochain créneau n'est pas consécutif
-        if (index === times.length - 1 || 
-            !isConsecutiveTime(time, times[index + 1])) {
+        if (i === times.length - 1 || !isConsecutiveTime(time, times[i + 1])) {
           currentRange.endTime = addMinutes(time, 30);
+          console.log('Ajout d\'une plage horaire:', { ...currentRange });
           ranges.push({ ...currentRange });
-          currentRange.startTime = null;
+          currentRange = {
+            day,
+            startTime: null,
+            endTime: null
+          };
         }
-      });
+      }
     });
 
+    console.log('Ranges finaux à envoyer:', ranges);
     return ranges;
   };
 
@@ -499,29 +509,49 @@ const Calendar = ({ isDarkMode }) => {
 
   const validateTimeSlots = (slots, isDelete = false) => {
     // Combiner les créneaux sélectionnés avec les disponibilités existantes
-    const allSlots = [...slots];
+    let allSlots = [];
     
-    // Ajouter les créneaux des disponibilités existantes
-    availabilities.forEach(slot => {
-      if (slot.startTime && slot.endTime) {
-        let currentTime = slot.startTime;
-        while (currentTime < slot.endTime) {
-          // En mode suppression, on exclut les créneaux à supprimer
-          if (isDelete && !slots.some(s => s.day === slot.day && s.time === currentTime)) {
-            allSlots.push({
-              day: slot.day,
-              time: currentTime
-            });
-          } else if (!isDelete) {
-            allSlots.push({
-              day: slot.day,
-              time: currentTime
-            });
+    if (isDelete) {
+      // En mode suppression, on simule l'état après suppression
+      // On ajoute tous les créneaux existants SAUF ceux qu'on veut supprimer
+      availabilities.forEach(slot => {
+        if (slot.startTime && slot.endTime) {
+          let currentTime = slot.startTime;
+          while (currentTime < slot.endTime) {
+            // On ajoute le créneau seulement s'il n'est pas dans la liste à supprimer
+            if (!slots.some(s => s.day === slot.day && s.time === currentTime)) {
+              allSlots.push({
+                day: slot.day,
+                time: currentTime
+              });
+            }
+            currentTime = addMinutes(currentTime, 30);
           }
-          currentTime = addMinutes(currentTime, 30);
         }
+      });
+
+      // Si aucun créneau n'est trouvé après la suppression, c'est valide
+      if (allSlots.length === 0) {
+        return true;
       }
-    });
+    } else {
+      // En mode ajout, on combine les créneaux existants avec les nouveaux
+      allSlots = [...slots];
+      availabilities.forEach(slot => {
+        if (slot.startTime && slot.endTime) {
+          let currentTime = slot.startTime;
+          while (currentTime < slot.endTime) {
+            if (!allSlots.some(s => s.day === slot.day && s.time === currentTime)) {
+              allSlots.push({
+                day: slot.day,
+                time: currentTime
+              });
+            }
+            currentTime = addMinutes(currentTime, 30);
+          }
+        }
+      });
+    }
 
     // Trier les créneaux par jour et heure
     const sortedSlots = [...allSlots].sort((a, b) => {
@@ -536,12 +566,16 @@ const Calendar = ({ isDarkMode }) => {
       slotsByDay[slot.day].add(slot.time);
     });
 
+    // Si après regroupement il n'y a aucun jour, c'est valide
+    if (Object.keys(slotsByDay).length === 0) {
+      return true;
+    }
+
     // Vérifier chaque jour
     for (const day in slotsByDay) {
       const times = Array.from(slotsByDay[day]).sort();
       let currentGroup = [];
 
-      // Parcourir tous les créneaux du jour
       for (let i = 0; i < times.length; i++) {
         const currentTime = times[i];
         
@@ -550,17 +584,14 @@ const Calendar = ({ isDarkMode }) => {
         } else {
           const lastTime = currentGroup[currentGroup.length - 1];
           
-          // Calculer la différence en minutes
           const [lastHour, lastMin] = lastTime.split(':').map(Number);
           const [currentHour, currentMin] = currentTime.split(':').map(Number);
           const lastTotalMins = lastHour * 60 + lastMin;
           const currentTotalMins = currentHour * 60 + currentMin;
           
           if (currentTotalMins - lastTotalMins === 30) {
-            // Les créneaux sont consécutifs
             currentGroup.push(currentTime);
           } else {
-            // Si le groupe précédent est trop petit, retourner false
             if (currentGroup.length < 3) {
               setNotification({
                 message: 'Les plages horaires doivent être plus grandes que 1h30',
@@ -569,7 +600,6 @@ const Calendar = ({ isDarkMode }) => {
               setTimeout(() => setNotification({ message: '', type: '' }), 3000);
               return false;
             }
-            // Commencer un nouveau groupe
             currentGroup = [currentTime];
           }
         }
@@ -660,32 +690,27 @@ const Calendar = ({ isDarkMode }) => {
       } else if (mode === 'delete' && unsavedAvailabilities.length > 0) {
         // Vérifier que les plages horaires restantes seront valides après suppression
         if (!validateTimeSlots(unsavedAvailabilities, true)) {
-          setError('La suppression créerait des plages horaires inférieures à 1h30');
-          setSaveStatus('error');
-          setTimeout(() => {
-            setError(null);
-            setSaveStatus('');
-          }, 3000);
+          setNotification({
+            message: 'La suppression est impossible car certaines plages horaires deviendraient inférieures à 1h30',
+            type: 'error'
+          });
+          setTimeout(() => setNotification({ message: '', type: '' }), 3000);
           return;
         }
 
+        // Si la validation réussit, on procède à la suppression
         const slotsToDelete = convertSlotsToRanges(unsavedAvailabilities);
         
-        const deleteResponse = await axios.post(
-          `${config.API_URL}/api/teacher/availabilities/delete`,
-          { availabilitiesToDelete: slotsToDelete },
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+        console.log('Slots à supprimer (avant envoi):', slotsToDelete);
+        console.log('Payload complet:', { availabilitiesToDelete: slotsToDelete });
 
-        if (deleteResponse.data) {
-          // Recharger les disponibilités après la suppression
-          const getResponse = await axios.get(
-            `${config.API_URL}/api/teacher/availabilities`,
+        try {
+          const deleteResponse = await axios.post(
+            `${config.API_URL}/api/teacher/availabilities/delete`,
+            { 
+              availabilitiesToDelete: slotsToDelete,
+              teacherId: JSON.parse(sessionStorage.getItem('user')).userId // Ajout explicite de l'ID
+            },
             {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -694,15 +719,48 @@ const Calendar = ({ isDarkMode }) => {
             }
           );
 
-          setAvailabilities(getResponse.data);
-          setUnsavedAvailabilities([]);
-          setSaveStatus('saved');
-          setMode('view');
-          
-          setTimeout(() => {
-            setSaveStatus('');
-            setError(null);
-          }, 2000);
+          if (deleteResponse.data && deleteResponse.status === 200) {
+            try {
+              // Recharger les disponibilités après la suppression
+              const getResponse = await axios.get(
+                `${config.API_URL}/api/teacher/availabilities`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  },
+                  // Utiliser les options axios pour éviter le cache
+                  params: {
+                    _: new Date().getTime() // Ajouter un timestamp comme paramètre
+                  }
+                }
+              );
+
+              // Mise à jour de l'état avec les nouvelles données
+              setAvailabilities(getResponse.data);
+              setUnsavedAvailabilities([]);
+              setMode('view');
+              
+              setNotification({
+                message: 'Les disponibilités ont été supprimées avec succès',
+                type: 'success'
+              });
+              
+              setTimeout(() => {
+                setError(null);
+                setNotification({ message: '', type: '' });
+              }, 2000);
+            } catch (error) {
+              console.error('Erreur lors du rechargement des données:', error);
+              setError('Les disponibilités ont été supprimées mais le rechargement a échoué');
+              setTimeout(() => setError(null), 3000);
+            }
+          }
+        } catch (error) {
+          console.error('Erreur détaillée:', error);
+          console.error('Réponse du serveur en cas d\'erreur:', error.response);
+          setError(error.response?.data?.message || 'Erreur lors de la suppression des disponibilités');
+          setTimeout(() => setError(null), 3000);
         }
       }
     } catch (error) {
