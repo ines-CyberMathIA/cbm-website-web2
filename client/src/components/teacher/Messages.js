@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
 import { FiSend, FiSearch, FiCheck, FiClock, FiMessageCircle, FiMenu } from 'react-icons/fi';
+import config from '../../config';
 
 const Messages = ({ isDarkMode }) => {
   const [newMessage, setNewMessage] = useState('');
@@ -13,7 +14,115 @@ const Messages = ({ isDarkMode }) => {
   const [activeChannel, setActiveChannel] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const { user } = useAuth();
+  const [currentUserId, setCurrentUserId] = useState(null);
   const messagesEndRef = useRef(null);
+
+  console.log('User object:', user);
+
+  // Logs pour le débogage
+  useEffect(() => {
+    console.log('=== DÉBUT DU DÉBOGAGE MESSAGES ===');
+    
+    // Log du token
+    const token = sessionStorage.getItem('token');
+    console.log('Token brut:', token);
+    
+    if (token) {
+      try {
+        const [header, payload, signature] = token.split('.');
+        const decodedPayload = JSON.parse(atob(payload));
+        console.log('Token décodé:', {
+          header: JSON.parse(atob(header)),
+          payload: decodedPayload,
+          userId: decodedPayload.userId
+        });
+      } catch (error) {
+        console.error('Erreur décodage token:', error);
+      }
+    }
+
+    // Log de la session storage
+    console.log('Session Storage complet:', {
+      keys: Object.keys(sessionStorage),
+      user: sessionStorage.getItem('user'),
+      token: sessionStorage.getItem('token')
+    });
+
+    // Log de l'utilisateur parsé
+    try {
+      const userStr = sessionStorage.getItem('user');
+      if (userStr) {
+        const parsedUser = JSON.parse(userStr);
+        console.log('Utilisateur parsé:', parsedUser);
+      }
+    } catch (error) {
+      console.error('Erreur parsing user:', error);
+    }
+
+    console.log('=== FIN DU DÉBOGAGE MESSAGES ===');
+  }, []);
+
+  // Récupérer l'ID de l'utilisateur depuis le token JWT
+  useEffect(() => {
+    console.log('=== DÉBUT RÉCUPÉRATION ID ===');
+    const token = sessionStorage.getItem('token');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        console.log('Payload du token pour ID:', payload);
+        if (payload.userId) {
+          console.log('ID trouvé dans le token:', payload.userId);
+          setCurrentUserId(payload.userId);
+        }
+      } catch (error) {
+        console.error('Erreur décodage token pour ID:', error);
+      }
+    }
+    console.log('=== FIN RÉCUPÉRATION ID ===');
+  }, []);
+
+  // Log à chaque changement de currentUserId
+  useEffect(() => {
+    console.log('currentUserId mis à jour:', currentUserId);
+  }, [currentUserId]);
+
+  // Ajoutons des logs au début du composant pour déboguer
+  useEffect(() => {
+    console.log('Auth state:', {
+      user,
+      userId: user?.id,
+      userObject: JSON.stringify(user)
+    });
+  }, [user]);
+
+  useEffect(() => {
+    // Log détaillé de l'état de l'authentification
+    const userFromSession = JSON.parse(sessionStorage.getItem('user'));
+    console.log('Auth Debug:', {
+      authUser: user,
+      sessionUser: userFromSession,
+      sessionStorage: Object.keys(sessionStorage),
+      localStorage: Object.keys(localStorage)
+    });
+  }, [user]);
+
+  // Vérification de l'état après mise à jour
+  useEffect(() => {
+    console.log('Current User State:', {
+      currentUserId,
+      user,
+      isAuthenticated: !!user,
+      sessionUser: JSON.parse(sessionStorage.getItem('user'))
+    });
+  }, [currentUserId, user]);
+
+  // Configuration d'axios avec le token et récupération de l'ID utilisateur
+  const getAxiosConfig = () => {
+    const token = sessionStorage.getItem('token');
+    return {
+      headers: { Authorization: `Bearer ${token}` }
+    };
+  };
 
   // Récupérer les informations du manager et créer le canal de discussion
   useEffect(() => {
@@ -57,12 +166,15 @@ const Messages = ({ isDarkMode }) => {
       try {
         const token = sessionStorage.getItem('token');
         const response = await axios.get(
-          `http://localhost:5000/api/messages/channel/${activeChannel._id}`,
+          `${config.API_URL}/api/messages/channel/${activeChannel._id}`,
           {
             headers: { Authorization: `Bearer ${token}` }
           }
         );
-        console.log('Messages received:', response.data);
+        console.log('Messages received:', {
+          messages: response.data,
+          currentUserId: user?.userId
+        });
         setMessages(response.data);
         scrollToBottom();
       } catch (error) {
@@ -93,7 +205,7 @@ const Messages = ({ isDarkMode }) => {
       });
       
       const response = await axios.post(
-        'http://localhost:5000/api/messages/send',
+        `${config.API_URL}/api/messages/send`,
         {
           content: newMessage,
           channelId: activeChannel._id
@@ -112,6 +224,28 @@ const Messages = ({ isDarkMode }) => {
       alert('Erreur lors de l\'envoi du message. Veuillez réessayer.');
     }
   };
+
+  // Ajoutez un log pour déboguer les messages
+  useEffect(() => {
+    console.log('Messages:', messages);
+  }, [messages]);
+
+  useEffect(() => {
+    console.log('Current user:', {
+      userId: user?.userId,
+      role: user?.role,
+      fullUser: user
+    });
+  }, [user]);
+
+  // Log de débogage pour l'utilisateur
+  useEffect(() => {
+    console.log('Auth user:', {
+      user,
+      sessionUser: JSON.parse(sessionStorage.getItem('user')),
+      currentUserId
+    });
+  }, [user, currentUserId]);
 
   return (
     <div className="h-[calc(100vh-120px)] p-4">
@@ -213,37 +347,64 @@ const Messages = ({ isDarkMode }) => {
           <div className="flex-1 overflow-y-auto p-4">
             <div className="space-y-4">
               {messages.map((message, index) => {
-                const isCurrentUser = message.senderId === user.userId;
+                console.log('=== TRAITEMENT MESSAGE ===', {
+                  message,
+                  senderId: message.senderId,
+                  senderIdType: typeof message.senderId,
+                  senderIdValue: message.senderId._id,
+                  currentUserId,
+                  currentUserIdType: typeof currentUserId,
+                  comparison: message.senderId._id === currentUserId
+                });
+
+                // Utilisation du rôle pour déterminer si c'est notre message
+                const isOwnMessage = message.senderId._id === currentUserId;
+                console.log('Message comparison:', {
+                  messageId: message._id,
+                  senderId: message.senderId._id,
+                  currentUserId,
+                  isOwnMessage,
+                  tokenPayload: JSON.parse(atob(sessionStorage.getItem('token').split('.')[1]))
+                });
+
                 return (
                   <motion.div
                     key={message._id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
+                    transition={{ duration: 0.3, delay: index * 0.1 }}
+                    className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
                   >
-                    <div className={`max-w-[70%] ${isCurrentUser ? 'ml-auto' : 'mr-auto'}`}>
-                      <div className={`rounded-2xl px-4 py-3 shadow-sm ${
-                        isCurrentUser
-                          ? isDarkMode
-                            ? 'bg-gradient-to-r from-violet-500/30 to-purple-500/30 text-violet-50 border border-violet-400/30'
-                            : 'bg-gradient-to-r from-violet-100 to-purple-100 text-violet-900 border border-violet-200'
-                          : isDarkMode
-                            ? 'bg-gradient-to-r from-blue-500/30 to-indigo-500/30 text-blue-50 border border-blue-400/30'
-                            : 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-900 border border-blue-200'
-                      }`}>
-                        {message.content}
+                    {isOwnMessage ? (
+                      // Message envoyé
+                      <div className="max-w-[70%] bg-violet-500 text-white rounded-xl px-4 py-2 shadow-sm">
+                        <div className="text-sm">{message.content}</div>
+                        <div className="text-xs mt-1 text-violet-200">
+                          {new Date(message.createdAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
                       </div>
-                      <div className={`text-xs mt-1 ${
-                        isDarkMode 
-                          ? isCurrentUser ? 'text-violet-300/70' : 'text-blue-300/70'
-                          : isCurrentUser ? 'text-violet-400' : 'text-blue-400'
-                      } ${isCurrentUser ? 'text-right' : 'text-left'}`}>
-                        {new Date(message.timestamp).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
+                    ) : (
+                      // Message reçu
+                      <div className={`max-w-[70%] ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} rounded-xl px-4 py-2 shadow-sm`}>
+                        {activeChannel === 'manager' && (
+                          <div className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {`${message.senderId.firstName} ${message.senderId.lastName}`}
+                          </div>
+                        )}
+                        <div className={`text-sm ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
+                          {message.content}
+                        </div>
+                        <div className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          {new Date(message.createdAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </motion.div>
                 );
               })}
