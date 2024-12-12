@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useRef, useEffect, useContext, useCallback } from 'react';
 import axios from 'axios';
+import { motion, AnimatePresence } from 'framer-motion';
+import config from '../../config';
+import { ThemeContext } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { FiSend, FiSearch, FiCheck, FiClock, FiMessageCircle, FiMenu } from 'react-icons/fi';
-import config from '../../config';
 
 const Messages = ({ isDarkMode }) => {
   const [newMessage, setNewMessage] = useState('');
@@ -13,9 +14,13 @@ const Messages = ({ isDarkMode }) => {
   const [managerInfo, setManagerInfo] = useState(null);
   const [activeChannel, setActiveChannel] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [firstUnreadMessageId, setFirstUnreadMessageId] = useState(null);
+  const [showUnreadMarker, setShowUnreadMarker] = useState(false);
   const { user } = useAuth();
   const [currentUserId, setCurrentUserId] = useState(null);
   const messagesEndRef = useRef(null);
+  const unreadMarkerRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
   console.log('User object:', user);
 
@@ -143,11 +148,13 @@ const Messages = ({ isDarkMode }) => {
   // Créer ou récupérer le canal lors de la sélection d'un contact
   const handleChannelSelect = async (contact) => {
     try {
+      console.log('Contact sélectionné:', contact);
       const response = await axios.post(
         `${config.API_URL}/api/messages/channel`,
         { receiverId: contact.id },
         getAxiosConfig()
       );
+      console.log('Canal créé/récupéré:', response.data);
       setActiveChannel(response.data);
     } catch (error) {
       console.error('Erreur lors de la création du canal:', error);
@@ -163,11 +170,108 @@ const Messages = ({ isDarkMode }) => {
         `${config.API_URL}/api/messages/channel/${activeChannel._id}`,
         getAxiosConfig()
       );
+      
+      // Trouver le premier message non lu
+      const firstUnread = response.data.find(msg => 
+        !msg.readBy?.includes(currentUserId) && 
+        msg.senderId._id !== currentUserId
+      );
+
       setMessages(response.data);
+      
+      if (firstUnread) {
+        console.log('Message non lu trouvé, activation du marqueur');
+        setFirstUnreadMessageId(firstUnread._id);
+        setShowUnreadMarker(true);
+
+        // Programmer la disparition de la barre
+        setTimeout(() => {
+          console.log('Début de la disparition de la barre');
+          setShowUnreadMarker(false);
+
+          // Marquer les messages comme lus
+          const unreadMessages = response.data
+            .filter(msg => !msg.readBy?.includes(currentUserId) && msg.senderId._id !== currentUserId)
+            .map(msg => msg._id);
+
+          setTimeout(async () => {
+            try {
+              await axios.post(
+                `${config.API_URL}/api/messages/markAsRead`,
+                {
+                  channelId: activeChannel._id,
+                  messageIds: unreadMessages
+                },
+                getAxiosConfig()
+              );
+              
+              console.log('Messages marqués comme lus');
+              setFirstUnreadMessageId(null);
+              
+              setMessages(prevMessages => 
+                prevMessages.map(msg => {
+                  if (unreadMessages.includes(msg._id)) {
+                    return {
+                      ...msg,
+                      readBy: [...(msg.readBy || []), currentUserId]
+                    };
+                  }
+                  return msg;
+                })
+              );
+            } catch (error) {
+              console.error('Erreur lors du marquage des messages comme lus:', error);
+            }
+          }, 1000); // Attendre que l'animation de disparition soit terminée
+        }, 8000); // Garder la barre visible pendant 8 secondes
+      } else {
+        console.log('Aucun message non lu');
+        setFirstUnreadMessageId(null);
+        setShowUnreadMarker(false);
+      }
     } catch (error) {
       console.error('Erreur lors du chargement des messages:', error);
     }
   };
+
+  // Fonction pour défiler vers le bas
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  // Fonction pour défiler vers le premier message non lu
+  const scrollToUnread = useCallback(() => {
+    unreadMarkerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
+
+  // Gérer le défilement initial lors du changement de canal
+  useEffect(() => {
+    if (!messages.length || !activeChannel?._id) return;
+
+    // On utilise une ref pour ne scroller qu'au chargement initial du canal
+    const isInitialLoad = !messagesContainerRef.current;
+    if (!isInitialLoad) return;
+
+    messagesContainerRef.current = true;
+
+    const hasUnreadMessages = messages.some(
+      msg => !msg.readBy?.includes(currentUserId) && msg.senderId._id !== currentUserId
+    );
+
+    // Attendre que le rendu soit terminé
+    setTimeout(() => {
+      if (hasUnreadMessages) {
+        scrollToUnread();
+      } else {
+        scrollToBottom();
+      }
+    }, 100);
+  }, [activeChannel?._id, messages.length, scrollToUnread, scrollToBottom, currentUserId]);
+
+  // Réinitialiser la ref quand on change de canal
+  useEffect(() => {
+    messagesContainerRef.current = null;
+  }, [activeChannel?._id]);
 
   // Mettre à jour les messages périodiquement
   useEffect(() => {
@@ -178,12 +282,8 @@ const Messages = ({ isDarkMode }) => {
     }
   }, [activeChannel?._id]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  // Envoyer un message
-  const handleSendMessage = async (e) => {
+  // Envoyer un nouveau message
+  const sendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !activeChannel?._id) return;
 
@@ -204,6 +304,13 @@ const Messages = ({ isDarkMode }) => {
       console.error('Erreur lors de l\'envoi du message:', error);
     }
   };
+
+  // Défiler vers le bas après le premier chargement des messages
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [activeChannel?._id]); // Seulement quand on change de conversation
 
   // Ajoutez un log pour déboguer les messages
   useEffect(() => {
@@ -227,14 +334,22 @@ const Messages = ({ isDarkMode }) => {
     });
   }, [user, currentUserId]);
 
+  // Fonction pour formater l'heure
+  const formatTime = (timestamp) => {
+    return new Date(timestamp).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   return (
     <div className="w-full h-full p-2 sm:p-4">
       <div className={`h-full flex rounded-2xl overflow-hidden shadow-lg relative ${isDarkMode ? 'bg-gray-900/50 border border-gray-800' : 'bg-white/80 border border-gray-100'}`}>
         {/* Ligne de séparation verticale absolue */}
-        <div className={`absolute top-0 left-80 w-[1px] h-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
+        <div className={`absolute top-0 left-80 w-[1px] h-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} ${!isSidebarOpen && 'hidden'}`}></div>
         
         {/* Sidebar avec les contacts */}
-        <div className={`w-64 sm:w-80 ${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full flex flex-col`}>
+        <div className={`w-64 sm:w-80 ${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full flex flex-col transition-all duration-300 ${!isSidebarOpen ? '-ml-80' : 'ml-0'}`}>
           <div className={`h-[72px] flex items-center px-6 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
             <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
               Messages
@@ -245,17 +360,29 @@ const Messages = ({ isDarkMode }) => {
             {managerInfo && (
               <div 
                 onClick={() => handleChannelSelect(managerInfo)}
-                className={`p-4 flex items-center cursor-pointer transition-all duration-200 ${
-                  activeChannel?.id === managerInfo.id 
-                    ? (isDarkMode ? 'bg-gray-800' : 'bg-indigo-50') 
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                className={`relative p-4 flex items-center cursor-pointer transition-all duration-200 ${
+                  activeChannel 
+                    ? isDarkMode
+                      ? 'bg-gray-800/50 border-l-4 border-indigo-500'
+                      : 'bg-indigo-50/80 border-l-4 border-indigo-500'
+                    : isDarkMode
+                      ? 'hover:bg-gray-800/30'
+                      : 'hover:bg-gray-50'
                 }`}
               >
                 <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold">
                   {managerInfo.firstName?.[0]}{managerInfo.lastName?.[0]}
                 </div>
                 <div className="ml-3">
-                  <div className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  <div className={`font-medium ${
+                    activeChannel
+                      ? isDarkMode
+                        ? 'text-indigo-300'
+                        : 'text-indigo-700'
+                      : isDarkMode
+                        ? 'text-white'
+                        : 'text-gray-900'
+                  }`}>
                     {managerInfo.firstName} {managerInfo.lastName}
                   </div>
                   <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Manager</div>
@@ -348,9 +475,9 @@ const Messages = ({ isDarkMode }) => {
                   <div className="flex items-center space-x-4">
                     <button
                       onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                      className={`p-2 rounded-lg hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}
+                      className={`p-2 rounded-lg transition-colors ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
                     >
-                      <FiMenu size={24} className={isDarkMode ? 'text-white' : 'text-gray-600'} />
+                      <FiMenu className={`w-6 h-6 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'} transition-transform duration-300 ${isSidebarOpen ? 'rotate-0' : 'rotate-180'}`} />
                     </button>
                     {managerInfo && (
                       <>
@@ -372,83 +499,76 @@ const Messages = ({ isDarkMode }) => {
               </div>
 
               {/* Zone des messages */}
-              <div className="flex-1 overflow-y-auto p-4 max-h-[calc(100vh-16rem)]">
+              <div 
+                ref={messagesContainerRef}
+                className="flex-1 overflow-y-auto p-4 max-h-[calc(100vh-16rem)]" 
+                id="messages-container"
+              >
                 <div className="space-y-4">
                   {messages.map((message, index) => {
-                    console.log('=== TRAITEMENT MESSAGE ===', {
-                      message,
-                      senderId: message.senderId,
-                      senderIdType: typeof message.senderId,
-                      senderIdValue: message.senderId._id,
-                      currentUserId,
-                      currentUserIdType: typeof currentUserId,
-                      comparison: message.senderId._id === currentUserId
-                    });
-
-                    // Utilisation du rôle pour déterminer si c'est notre message
-                    const isOwnMessage = message.senderId._id === currentUserId;
-                    console.log('Message comparison:', {
-                      messageId: message._id,
-                      senderId: message.senderId._id,
-                      currentUserId,
-                      isOwnMessage,
-                      tokenPayload: JSON.parse(atob(sessionStorage.getItem('token').split('.')[1]))
-                    });
+                    const isCurrentUser = message.senderId._id === currentUserId;
+                    const isUnread = !message.readBy?.includes(currentUserId) && !isCurrentUser;
+                    const isFirstUnread = message._id === firstUnreadMessageId;
 
                     return (
-                      <motion.div
-                        key={message._id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.1 }}
-                        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
-                      >
-                        {isOwnMessage ? (
-                          // Message envoyé
+                      <React.Fragment key={message._id}>
+                        <AnimatePresence>
+                          {isFirstUnread && showUnreadMarker && (
+                            <motion.div
+                              key="unread-marker"
+                              ref={unreadMarkerRef}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ 
+                                opacity: { duration: 1 }
+                              }}
+                              className={`relative flex items-center justify-center my-6`}
+                            >
+                              <div className={`absolute w-full ${isDarkMode ? 'border-t border-gray-700' : 'border-t border-gray-200'}`}></div>
+                              <span className={`px-4 text-xs font-medium z-10 ${
+                                isDarkMode ? 'bg-gray-900 text-gray-400' : 'bg-white text-gray-500'
+                              }`}>
+                                Non lus
+                              </span>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3 }}
+                          className={`flex ${
+                            isCurrentUser ? 'justify-end' : 'justify-start'
+                          } mb-4 relative group`}
+                        >
                           <div
-                            className={`rounded-2xl px-6 py-3 ${
-                              isDarkMode
-                                ? 'bg-gray-700 text-white'
-                                : 'bg-white text-gray-900'
-                            } shadow-sm`}
+                            className={`flex flex-col ${
+                              isCurrentUser ? 'items-end' : 'items-start'
+                            }`}
                           >
-                            <div className="text-sm">{message.content}</div>
-                            <div className="text-xs mt-1 text-gray-400">
-                              {new Date(message.createdAt).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </div>
-                          </div>
-                        ) : (
-                          // Message reçu
-                          <div
-                            className={`rounded-2xl px-6 py-3 ${
-                              isDarkMode
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-indigo-100 text-gray-900'
-                            } shadow-sm`}
-                          >
-                            {activeChannel === 'manager' && (
-                              <div className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                {`${message.senderId.firstName} ${message.senderId.lastName}`}
+                            <div
+                              className={`rounded-lg px-4 py-2 min-w-[120px] max-w-[80%] break-words ${
+                                isCurrentUser
+                                  ? `${isDarkMode ? 'bg-blue-600' : 'bg-blue-500'} text-white`
+                                  : `${
+                                      isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
+                                    } ${isDarkMode ? 'text-white' : 'text-gray-900'}`
+                              }`}
+                            >
+                              <div className="mb-2">{message.content}</div>
+                              <div className={`text-xs ${
+                                isDarkMode ? 'text-gray-300/80' : 'text-gray-500/80'
+                              } text-right`}>
+                                {formatTime(message.createdAt)}
                               </div>
-                            )}
-                            <div className={`text-sm ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
-                              {message.content}
-                            </div>
-                            <div className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                              {new Date(message.createdAt).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
                             </div>
                           </div>
-                        )}
-                      </motion.div>
+                        </motion.div>
+                      </React.Fragment>
                     );
                   })}
-                  <div ref={messagesEndRef} />
+                  <div ref={messagesEndRef} style={{ height: '1px' }} /> {/* Élément invisible pour le défilement */}
                 </div>
               </div>
 
@@ -456,32 +576,27 @@ const Messages = ({ isDarkMode }) => {
               <div className={`p-4 ${isDarkMode ? 'bg-gray-900/70' : 'bg-white/90'} border-t backdrop-blur-sm ${
                 isDarkMode ? 'border-gray-700' : 'border-gray-200'
               }`}>
-                <form onSubmit={handleSendMessage} className="flex space-x-4">
+                <form onSubmit={sendMessage} className="flex space-x-4">
                   <input
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder="Écrivez votre message..."
-                    className={`flex-1 px-4 py-2 rounded-xl border ${
+                    className={`flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 ${
                       isDarkMode
-                        ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400'
-                        : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400'
-                    } focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-transparent`}
+                        ? 'bg-gray-800 text-white placeholder-gray-400 focus:ring-blue-500'
+                        : 'bg-white text-gray-900 placeholder-gray-500 focus:ring-blue-500'
+                    }`}
                   />
                   <button
                     type="submit"
-                    disabled={!newMessage.trim() || !activeChannel?._id}
-                    className={`px-6 py-2 rounded-xl transition-all ${
-                      newMessage.trim() && activeChannel?._id
-                        ? isDarkMode
-                          ? 'bg-gradient-to-r from-violet-500/40 to-purple-500/40 text-violet-50 hover:from-violet-500/50 hover:to-purple-500/50'
-                          : 'bg-gradient-to-r from-violet-200 to-purple-200 text-violet-700 border border-violet-300 hover:from-violet-300 hover:to-purple-300'
-                        : isDarkMode
-                          ? 'bg-gray-700 text-gray-400'
-                          : 'bg-gray-100 text-gray-400'
+                    className={`px-4 py-2 rounded-lg flex items-center justify-center transition-colors ${
+                      isDarkMode
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'bg-blue-500 hover:bg-blue-600 text-white'
                     }`}
                   >
-                    <FiSend size={20} />
+                    <FiSend className="w-5 h-5" />
                   </button>
                 </form>
               </div>

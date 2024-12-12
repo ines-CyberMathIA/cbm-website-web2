@@ -20,10 +20,10 @@ const messageSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  read: {
-    type: Boolean,
-    default: false
-  }
+  readBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }]
 }, { timestamps: true });
 
 // Index pour rechercher rapidement les messages d'un canal
