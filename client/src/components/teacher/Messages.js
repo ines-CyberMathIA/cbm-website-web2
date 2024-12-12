@@ -128,100 +128,80 @@ const Messages = ({ isDarkMode }) => {
   useEffect(() => {
     const fetchManagerInfo = async () => {
       try {
-        const token = sessionStorage.getItem('token');
         const response = await axios.get(
           'http://localhost:5000/api/teacher/manager-info',
-          {
-            headers: { Authorization: `Bearer ${token}` }
-          }
+          getAxiosConfig()
         );
-        console.log('Manager info:', response.data);
         setManagerInfo(response.data);
-        
-        // Créer ou récupérer le canal de discussion avec le manager
-        if (response.data && response.data.id) {  
-          const channelResponse = await axios.post(
-            'http://localhost:5000/api/messages/channel',
-            { receiverId: response.data.id },  
-            {
-              headers: { Authorization: `Bearer ${token}` }
-            }
-          );
-          console.log('Channel response:', channelResponse.data);
-          setActiveChannel(channelResponse.data);
-        }
       } catch (error) {
-        console.error('Erreur lors de la récupération des infos du manager:', error);
-        setLoading(false);
+        console.error('Erreur lors de la récupération des informations du manager:', error);
       }
     };
-
     fetchManagerInfo();
   }, []);
 
-  useEffect(() => {
-    const fetchMessages = async () => {
-      if (!activeChannel) return;
-      
-      try {
-        const token = sessionStorage.getItem('token');
-        const response = await axios.get(
-          `${config.API_URL}/api/messages/channel/${activeChannel._id}`,
-          {
-            headers: { Authorization: `Bearer ${token}` }
-          }
-        );
-        console.log('Messages received:', {
-          messages: response.data,
-          currentUserId: user?.userId
-        });
-        setMessages(response.data);
-        scrollToBottom();
-      } catch (error) {
-        console.error('Erreur lors du chargement des messages:', error);
-      }
-    };
+  // Créer ou récupérer le canal lors de la sélection d'un contact
+  const handleChannelSelect = async (contact) => {
+    try {
+      const response = await axios.post(
+        `${config.API_URL}/api/messages/channel`,
+        { receiverId: contact.id },
+        getAxiosConfig()
+      );
+      setActiveChannel(response.data);
+    } catch (error) {
+      console.error('Erreur lors de la création du canal:', error);
+    }
+  };
 
-    if (activeChannel) {
+  // Charger les messages du canal actif
+  const fetchMessages = async () => {
+    if (!activeChannel?._id) return;
+
+    try {
+      const response = await axios.get(
+        `${config.API_URL}/api/messages/channel/${activeChannel._id}`,
+        getAxiosConfig()
+      );
+      setMessages(response.data);
+    } catch (error) {
+      console.error('Erreur lors du chargement des messages:', error);
+    }
+  };
+
+  // Mettre à jour les messages périodiquement
+  useEffect(() => {
+    if (activeChannel?._id) {
       fetchMessages();
       const interval = setInterval(fetchMessages, 5000);
       return () => clearInterval(interval);
     }
-  }, [activeChannel]);
+  }, [activeChannel?._id]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Envoyer un message
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || !activeChannel) return;
+    if (!newMessage.trim() || !activeChannel?._id) return;
 
     try {
-      const token = sessionStorage.getItem('token');
-      console.log('Sending message:', {
-        content: newMessage,
-        channelId: activeChannel._id
-      });
-      
       const response = await axios.post(
         `${config.API_URL}/api/messages/send`,
         {
           content: newMessage,
           channelId: activeChannel._id
         },
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
+        getAxiosConfig()
       );
 
-      console.log('Message sent:', response.data);
-      setMessages([...messages, response.data]);
+      setMessages(prevMessages => [...prevMessages, response.data]);
       setNewMessage('');
       scrollToBottom();
     } catch (error) {
       console.error('Erreur lors de l\'envoi du message:', error);
-      alert('Erreur lors de l\'envoi du message. Veuillez réessayer.');
     }
   };
 
@@ -248,203 +228,265 @@ const Messages = ({ isDarkMode }) => {
   }, [user, currentUserId]);
 
   return (
-    <div className="h-[calc(100vh-120px)] p-4">
-      <div className={`flex h-full overflow-hidden rounded-2xl shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-        {/* Sidebar */}
-        <div className={`${isSidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 flex-shrink-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-r overflow-hidden`}>
-          <div className="h-full flex flex-col">
-            {/* En-tête de la sidebar */}
-            <div className={`p-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-              <div className="flex items-center justify-between">
-                <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Messages
-                </h2>
-              </div>
-            </div>
-
-            {/* Liste des canaux */}
-            <div className="flex-1 overflow-y-auto">
-              {managerInfo && (
-                <button
-                  onClick={() => setActiveChannel(managerInfo)}
-                  className={`w-full p-4 transition-all duration-200 ${
-                    activeChannel?.id === managerInfo.id
-                      ? isDarkMode
-                        ? 'bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border-l-4 border-l-blue-400'
-                        : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-l-blue-400'
-                      : ''
-                  } hover:${
-                    isDarkMode
-                      ? 'bg-gradient-to-r from-blue-500/10 to-indigo-500/10'
-                      : 'bg-gradient-to-r from-blue-50/70 to-indigo-50/70'
-                  }`}
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                      isDarkMode 
-                        ? 'bg-gradient-to-r from-blue-500/30 to-indigo-500/30 border border-blue-400/30' 
-                        : 'bg-gradient-to-r from-blue-100 to-indigo-100 border border-blue-200'
-                    }`}>
-                      <span className={`text-lg font-medium ${
-                        isDarkMode ? 'text-blue-100' : 'text-blue-700'
-                      }`}>
-                        {managerInfo.firstName[0]}{managerInfo.lastName[0]}
-                      </span>
-                    </div>
-                    <div>
-                      <div className={`font-medium ${
-                        isDarkMode ? 'text-blue-100' : 'text-blue-900'
-                      }`}>
-                        {managerInfo.firstName} {managerInfo.lastName}
-                      </div>
-                      <div className={
-                        isDarkMode ? 'text-blue-300/70' : 'text-blue-600'
-                      }>
-                        {managerInfo.role}
-                      </div>
-                    </div>
+    <div className="w-full h-full p-2 sm:p-4">
+      <div className={`h-full flex rounded-2xl overflow-hidden shadow-lg relative ${isDarkMode ? 'bg-gray-900/50 border border-gray-800' : 'bg-white/80 border border-gray-100'}`}>
+        {/* Ligne de séparation verticale absolue */}
+        <div className={`absolute top-0 left-80 w-[1px] h-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
+        
+        {/* Sidebar avec les contacts */}
+        <div className={`w-64 sm:w-80 ${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full flex flex-col`}>
+          <div className={`h-[72px] flex items-center px-6 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+            <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+              Messages
+            </h2>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {/* Liste des contacts */}
+            {managerInfo && (
+              <div 
+                onClick={() => handleChannelSelect(managerInfo)}
+                className={`p-4 flex items-center cursor-pointer transition-all duration-200 ${
+                  activeChannel?.id === managerInfo.id 
+                    ? (isDarkMode ? 'bg-gray-800' : 'bg-indigo-50') 
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+              >
+                <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold">
+                  {managerInfo.firstName?.[0]}{managerInfo.lastName?.[0]}
+                </div>
+                <div className="ml-3">
+                  <div className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {managerInfo.firstName} {managerInfo.lastName}
                   </div>
-                </button>
-              )}
-            </div>
+                  <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Manager</div>
+                </div>
+              </div>
+            )}
+            {/* Div pour remplir l'espace restant */}
+            <div className="flex-1 min-h-[200px]"></div>
           </div>
         </div>
 
         {/* Zone principale */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* En-tête */}
-          <div className={`p-4 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <button
-                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className={`p-2 rounded-lg hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}
-                >
-                  <FiMenu size={24} className={isDarkMode ? 'text-white' : 'text-gray-600'} />
-                </button>
-                {managerInfo && (
-                  <>
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-r from-cyan-400 to-blue-500`}>
-                      <span className="text-white text-base font-medium">
-                        {managerInfo.firstName[0]}{managerInfo.lastName[0]}
-                      </span>
-                    </div>
-                    <div>
-                      <h2 className={`text-base font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {managerInfo.firstName} {managerInfo.lastName}
-                      </h2>
-                      <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Manager
-                      </div>
-                    </div>
-                  </>
-                )}
+        <div className="flex-1 flex flex-col h-full overflow-hidden">
+          {!activeChannel ? (
+            // Page de garde
+            <div className="flex-1 p-8 relative overflow-hidden">
+              {/* Formes abstraites d'arrière-plan */}
+              <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
+                <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
+                <div className="absolute -bottom-8 left-20 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
+              </div>
+
+              {/* Contenu principal */}
+              <div className={`relative z-10 max-w-2xl mx-auto p-8 rounded-2xl shadow-lg backdrop-blur-sm ${
+                isDarkMode 
+                  ? 'bg-gray-900/70 border border-gray-800' 
+                  : 'bg-white/70 border border-gray-200'
+              }`}>
+                <div className="mb-8">
+                  <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                    Bienvenue dans votre espace messagerie
+                  </h1>
+                  <p className={`text-lg mb-8 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    Un espace d'échange sécurisé pour communiquer avec votre manager et vos élèves
+                  </p>
+                </div>
+
+                {/* Cartes d'information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  <div className={`p-6 rounded-xl shadow-sm ${isDarkMode ? 'bg-gray-800/50 border border-gray-700' : 'bg-white/80 border border-gray-200'}`}>
+                    <h2 className="text-xl font-semibold mb-4 text-indigo-500">Communication</h2>
+                    <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                      Échangez avec bienveillance et professionnalisme avec votre manager, les familles et les élèves.
+                    </p>
+                  </div>
+                  <div className={`p-6 rounded-xl shadow-sm ${isDarkMode ? 'bg-gray-800/50 border border-gray-700' : 'bg-white/80 border border-gray-200'}`}>
+                    <h2 className="text-xl font-semibold mb-4 text-indigo-500">Support</h2>
+                    <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                      En cas de besoin, contactez d'abord votre manager. Pour toute autre question : 
+                      <a href="mailto:support@cybermathia.com" className="text-indigo-500 hover:text-indigo-600 ml-1">
+                        support@cybermathia.com
+                      </a>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Règles de communication */}
+                <div className={`p-6 rounded-xl shadow-sm ${isDarkMode ? 'bg-gray-800/50 border border-gray-700' : 'bg-white/80 border border-gray-200'}`}>
+                  <h2 className="text-xl font-semibold mb-4 text-indigo-500">Règles de communication</h2>
+                  <ul className={`text-left space-y-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    <li className="flex items-center">
+                      <svg className="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                      Restez professionnel et courtois dans vos échanges
+                    </li>
+                    <li className="flex items-center">
+                      <svg className="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                      Répondez dans un délai raisonnable
+                    </li>
+                    <li className="flex items-center">
+                      <svg className="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                      Privilégiez des messages clairs et concis
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* Zone des messages */}
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="space-y-4">
-              {messages.map((message, index) => {
-                console.log('=== TRAITEMENT MESSAGE ===', {
-                  message,
-                  senderId: message.senderId,
-                  senderIdType: typeof message.senderId,
-                  senderIdValue: message.senderId._id,
-                  currentUserId,
-                  currentUserIdType: typeof currentUserId,
-                  comparison: message.senderId._id === currentUserId
-                });
-
-                // Utilisation du rôle pour déterminer si c'est notre message
-                const isOwnMessage = message.senderId._id === currentUserId;
-                console.log('Message comparison:', {
-                  messageId: message._id,
-                  senderId: message.senderId._id,
-                  currentUserId,
-                  isOwnMessage,
-                  tokenPayload: JSON.parse(atob(sessionStorage.getItem('token').split('.')[1]))
-                });
-
-                return (
-                  <motion.div
-                    key={message._id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.1 }}
-                    className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
-                  >
-                    {isOwnMessage ? (
-                      // Message envoyé
-                      <div className="max-w-[70%] bg-violet-500 text-white rounded-xl px-4 py-2 shadow-sm">
-                        <div className="text-sm">{message.content}</div>
-                        <div className="text-xs mt-1 text-violet-200">
-                          {new Date(message.createdAt).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
+          ) : (
+            // Zone de chat
+            <div className="flex-1 flex flex-col">
+              {/* En-tête */}
+              <div className={`h-[72px] flex items-center px-6 ${isDarkMode ? 'bg-gray-900/70' : 'bg-white/90'} border-b backdrop-blur-sm ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center space-x-4">
+                    <button
+                      onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                      className={`p-2 rounded-lg hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}
+                    >
+                      <FiMenu size={24} className={isDarkMode ? 'text-white' : 'text-gray-600'} />
+                    </button>
+                    {managerInfo && (
+                      <>
+                        <div className={`w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold`}>
+                          {managerInfo.firstName?.[0]}{managerInfo.lastName?.[0]}
                         </div>
-                      </div>
-                    ) : (
-                      // Message reçu
-                      <div className={`max-w-[70%] ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} rounded-xl px-4 py-2 shadow-sm`}>
-                        {activeChannel === 'manager' && (
-                          <div className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {`${message.senderId.firstName} ${message.senderId.lastName}`}
+                        <div>
+                          <h2 className={`text-base font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {managerInfo.firstName} {managerInfo.lastName}
+                          </h2>
+                          <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            Manager
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Zone des messages */}
+              <div className="flex-1 overflow-y-auto p-4 max-h-[calc(100vh-16rem)]">
+                <div className="space-y-4">
+                  {messages.map((message, index) => {
+                    console.log('=== TRAITEMENT MESSAGE ===', {
+                      message,
+                      senderId: message.senderId,
+                      senderIdType: typeof message.senderId,
+                      senderIdValue: message.senderId._id,
+                      currentUserId,
+                      currentUserIdType: typeof currentUserId,
+                      comparison: message.senderId._id === currentUserId
+                    });
+
+                    // Utilisation du rôle pour déterminer si c'est notre message
+                    const isOwnMessage = message.senderId._id === currentUserId;
+                    console.log('Message comparison:', {
+                      messageId: message._id,
+                      senderId: message.senderId._id,
+                      currentUserId,
+                      isOwnMessage,
+                      tokenPayload: JSON.parse(atob(sessionStorage.getItem('token').split('.')[1]))
+                    });
+
+                    return (
+                      <motion.div
+                        key={message._id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: index * 0.1 }}
+                        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
+                      >
+                        {isOwnMessage ? (
+                          // Message envoyé
+                          <div
+                            className={`rounded-2xl px-6 py-3 ${
+                              isDarkMode
+                                ? 'bg-gray-700 text-white'
+                                : 'bg-white text-gray-900'
+                            } shadow-sm`}
+                          >
+                            <div className="text-sm">{message.content}</div>
+                            <div className="text-xs mt-1 text-gray-400">
+                              {new Date(message.createdAt).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          // Message reçu
+                          <div
+                            className={`rounded-2xl px-6 py-3 ${
+                              isDarkMode
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-indigo-100 text-gray-900'
+                            } shadow-sm`}
+                          >
+                            {activeChannel === 'manager' && (
+                              <div className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                {`${message.senderId.firstName} ${message.senderId.lastName}`}
+                              </div>
+                            )}
+                            <div className={`text-sm ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
+                              {message.content}
+                            </div>
+                            <div className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                              {new Date(message.createdAt).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </div>
                           </div>
                         )}
-                        <div className={`text-sm ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
-                          {message.content}
-                        </div>
-                        <div className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                          {new Date(message.createdAt).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                );
-              })}
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
+                      </motion.div>
+                    );
+                  })}
+                  <div ref={messagesEndRef} />
+                </div>
+              </div>
 
-          {/* Zone de saisie */}
-          <div className={`p-4 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border-t ${
-            isDarkMode ? 'border-gray-700' : 'border-gray-200'
-          }`}>
-            <form onSubmit={handleSendMessage} className="flex space-x-4">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Écrivez votre message..."
-                className={`flex-1 px-4 py-2 rounded-xl border ${
-                  isDarkMode
-                    ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400'
-                    : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400'
-                } focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-transparent`}
-              />
-              <button
-                type="submit"
-                disabled={!newMessage.trim()}
-                className={`px-6 py-2 rounded-xl transition-all ${
-                  newMessage.trim()
-                    ? isDarkMode
-                      ? 'bg-gradient-to-r from-violet-500/40 to-purple-500/40 text-violet-50 hover:from-violet-500/50 hover:to-purple-500/50'
-                      : 'bg-gradient-to-r from-violet-200 to-purple-200 text-violet-700 border border-violet-300 hover:from-violet-300 hover:to-purple-300'
-                    : isDarkMode
-                      ? 'bg-gray-700 text-gray-400'
-                      : 'bg-gray-100 text-gray-400'
-                }`}
-              >
-                <FiSend size={20} />
-              </button>
-            </form>
-          </div>
+              {/* Zone de saisie */}
+              <div className={`p-4 ${isDarkMode ? 'bg-gray-900/70' : 'bg-white/90'} border-t backdrop-blur-sm ${
+                isDarkMode ? 'border-gray-700' : 'border-gray-200'
+              }`}>
+                <form onSubmit={handleSendMessage} className="flex space-x-4">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Écrivez votre message..."
+                    className={`flex-1 px-4 py-2 rounded-xl border ${
+                      isDarkMode
+                        ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400'
+                        : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400'
+                    } focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-transparent`}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!newMessage.trim() || !activeChannel?._id}
+                    className={`px-6 py-2 rounded-xl transition-all ${
+                      newMessage.trim() && activeChannel?._id
+                        ? isDarkMode
+                          ? 'bg-gradient-to-r from-violet-500/40 to-purple-500/40 text-violet-50 hover:from-violet-500/50 hover:to-purple-500/50'
+                          : 'bg-gradient-to-r from-violet-200 to-purple-200 text-violet-700 border border-violet-300 hover:from-violet-300 hover:to-purple-300'
+                        : isDarkMode
+                          ? 'bg-gray-700 text-gray-400'
+                          : 'bg-gray-100 text-gray-400'
+                    }`}
+                  >
+                    <FiSend size={20} />
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
