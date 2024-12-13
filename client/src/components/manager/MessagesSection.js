@@ -15,6 +15,7 @@ const MessagesSection = () => {
   const [showUnreadMarker, setShowUnreadMarker] = useState(true);
   const [firstUnreadMessageId, setFirstUnreadMessageId] = useState(null);
   const [userHasScrolled, setUserHasScrolled] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const messagesEndRef = useRef(null);
   const unreadMarkerRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -27,6 +28,15 @@ const MessagesSection = () => {
       headers: { Authorization: `Bearer ${token}` }
     };
   };
+
+  // Récupérer l'ID de l'utilisateur connecté
+  useEffect(() => {
+    const token = sessionStorage.getItem('token');
+    if (token) {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      setCurrentUserId(payload.userId);
+    }
+  }, []);
 
   // Charger la liste des professeurs
   useEffect(() => {
@@ -74,7 +84,7 @@ const MessagesSection = () => {
   // Charger les messages quand un professeur est sélectionné
   useEffect(() => {
     const fetchMessages = async () => {
-      if (!selectedChannel) return;
+      if (!selectedChannel || !currentUserId) return;
       
       try {
         const response = await axios.get(
@@ -84,7 +94,7 @@ const MessagesSection = () => {
         
         // Trouver le premier message non lu
         const firstUnread = response.data.find(msg => 
-          msg.senderId._id !== selectedTeacher._id && !msg.readBy?.includes(selectedTeacher._id)
+          msg.senderId._id !== currentUserId && !msg.readBy?.includes(currentUserId)
         );
 
         setMessages(response.data);
@@ -132,7 +142,7 @@ const MessagesSection = () => {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [selectedChannel, selectedTeacher]);
+  }, [selectedChannel, selectedTeacher, currentUserId]);
 
   // Envoyer un message
   const handleSendMessage = async (e) => {
@@ -195,7 +205,7 @@ const MessagesSection = () => {
 
     try {
       const unreadMessages = messages
-        .filter(msg => !msg.readBy?.includes(selectedTeacher._id) && msg.senderId._id !== selectedTeacher._id)
+        .filter(msg => !msg.readBy?.includes(currentUserId) && msg.senderId._id !== currentUserId)
         .map(msg => msg._id);
 
       if (unreadMessages.length === 0) return;
@@ -404,8 +414,8 @@ const MessagesSection = () => {
                 {/* Messages */}
                 <div className="space-y-4">
                   {messages.map((message, index) => {
-                    const isCurrentUser = message.senderId.role === 'manager';
-                    const isUnread = !message.readBy?.includes(selectedTeacher._id) && !isCurrentUser;
+                    const isCurrentUser = message.senderId._id === currentUserId;
+                    const isUnread = !message.readBy?.includes(currentUserId) && !isCurrentUser;
                     const isFirstUnread = message._id === firstUnreadMessageId;
                     const showDateDivider = shouldShowDate(message, messages[index - 1]);
 
