@@ -14,14 +14,14 @@ const MessageComponent = ({ message, isCurrentUser, formatTime, isDarkMode }) =>
         <div
           className={`rounded-lg px-4 py-2 min-w-[120px] max-w-[80%] break-words ${
             !isCurrentUser
-              ? `${isDarkMode ? 'bg-indigo-500/90' : 'bg-indigo-400'} text-white`
+              ? `${isDarkMode ? 'bg-indigo-500/90' : 'bg-indigo-100'} ${isDarkMode ? 'text-white' : 'text-indigo-900'}`
               : `${
-                  isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
-                } ${isDarkMode ? 'text-white' : 'text-gray-900'}`
+                  isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
+                } ${isDarkMode ? 'text-white' : 'text-gray-600'}`
           }`}
         >
           <div className="mb-2">{message.content}</div>
-          <div className={`text-xs ${isCurrentUser ? 'text-stone-700' : 'text-white/80'} text-right flex items-center justify-end gap-1`}>
+          <div className={`text-xs ${!isCurrentUser ? (isDarkMode ? 'text-white/80' : 'text-indigo-700') : (isDarkMode ? 'text-gray-400' : 'text-gray-400')} text-right flex items-center justify-end gap-1`}>
             <span>{formatTime(message.createdAt)}</span>
             {isCurrentUser && (
               <div className="flex items-center ml-1">

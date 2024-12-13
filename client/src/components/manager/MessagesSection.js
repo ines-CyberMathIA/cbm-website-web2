@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../../contexts/ThemeContext';
-import { FiSend, FiSearch, FiCheck, FiMessageCircle, FiMenu } from 'react-icons/fi';
+import { FiCheck, FiSearch, FiMessageCircle, FiMenu, FiSend } from 'react-icons/fi';
 
 const MessagesSection = () => {
   const [teachers, setTeachers] = useState([]);
@@ -218,35 +218,50 @@ const MessagesSection = () => {
     return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const formatDate = (date) => {
+    const messageDate = new Date(date);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (messageDate.toDateString() === today.toDateString()) {
+      return "Aujourd'hui";
+    } else if (messageDate.toDateString() === yesterday.toDateString()) {
+      return "Hier";
+    } else {
+      return messageDate.toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    }
+  };
+
+  const shouldShowDate = (currentMessage, previousMessage) => {
+    if (!previousMessage) return true;
+    
+    const currentDate = new Date(currentMessage.createdAt).toDateString();
+    const previousDate = new Date(previousMessage.createdAt).toDateString();
+    
+    return currentDate !== previousDate;
+  };
+
   const filteredTeachers = teachers.filter(teacher =>
     teacher.status === 'active' &&
     `${teacher.firstName} ${teacher.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <div className="h-[calc(100vh-6rem)] mx-4 my-6">
-      <div className="h-full flex flex-col md:flex-row rounded-2xl overflow-hidden shadow-xl border border-opacity-10 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}">
+    <div className="h-[calc(100vh-8rem)] mx-4 my-6">
+      <div className={`flex h-full flex-col md:flex-row rounded-2xl overflow-hidden shadow-lg border ${darkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-100'}`}>
         {/* Sidebar des professeurs */}
         <div className={`${
           selectedTeacher ? 'hidden md:flex' : 'flex'
-        } flex-col w-full md:w-80 border-r border-opacity-10 ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+        } w-full md:w-80 flex-col ${darkMode ? 'bg-gray-800' : 'bg-white'} border-r ${darkMode ? 'border-gray-700/50' : 'border-gray-200'}`}>
           {/* En-tête de la sidebar */}
-          <div className={`p-6 border-b border-opacity-10 ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+          <div className={`p-6 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Messages</h2>
-              <button
-                onClick={() => window.location.href = '/manager/invite'}
-                className={`p-2 rounded-xl transition-colors duration-200 ${
-                  darkMode 
-                    ? 'hover:bg-gray-700 text-gray-400 hover:text-white' 
-                    : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
-                }`}
-                title="Inviter un professeur"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                </svg>
-              </button>
+              <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-700'}`}>Messages</h2>
             </div>
             <div className="relative">
               <input
@@ -256,9 +271,9 @@ const MessagesSection = () => {
                 placeholder="Rechercher un professeur..."
                 className={`w-full px-4 py-2 rounded-xl pl-10 ${
                   darkMode
-                    ? 'bg-gray-700 text-white placeholder-gray-400 border-gray-600'
-                    : 'bg-gray-50 text-gray-900 placeholder-gray-500 border-gray-200'
-                } border focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200`}
+                    ? 'bg-gray-700/80 text-gray-100 placeholder-gray-400 border-gray-600'
+                    : 'bg-slate-50 text-gray-800 placeholder-gray-500 border-gray-200'
+                } border focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200`}
               />
               <FiSearch className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
                 darkMode ? 'text-gray-400' : 'text-gray-500'
@@ -284,30 +299,30 @@ const MessagesSection = () => {
                   className={`w-full p-4 flex items-center gap-4 transition-all duration-200 ${
                     selectedTeacher?._id === teacher._id
                       ? darkMode
-                        ? 'bg-indigo-500/10 shadow-lg'
-                        : 'bg-indigo-50 shadow-md'
+                        ? 'bg-blue-500/10 shadow-lg'
+                        : 'bg-blue-50 shadow-md'
                       : darkMode
-                        ? 'hover:bg-gray-700'
-                        : 'hover:bg-gray-50'
+                        ? 'hover:bg-gray-700/50'
+                        : 'hover:bg-slate-50'
                   } ${index === 0 ? 'rounded-t-lg' : ''}`}
                 >
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                     selectedTeacher?._id === teacher._id
                       ? darkMode
-                        ? 'bg-indigo-500/20'
-                        : 'bg-indigo-100'
+                        ? 'bg-blue-500/20'
+                        : 'bg-blue-100'
                       : darkMode
-                        ? 'bg-gray-700'
-                        : 'bg-gray-100'
+                        ? 'bg-gray-700/80'
+                        : 'bg-slate-100'
                   }`}>
                     <span className={`text-lg font-medium ${
                       selectedTeacher?._id === teacher._id
                         ? darkMode
-                          ? 'text-indigo-300'
-                          : 'text-indigo-600'
+                          ? 'text-blue-300'
+                          : 'text-blue-600'
                         : darkMode
-                          ? 'text-gray-300'
-                          : 'text-gray-600'
+                          ? 'text-gray-200'
+                          : 'text-gray-700'
                     }`}>
                       {`${teacher.firstName[0]}${teacher.lastName[0]}`.toUpperCase()}
                     </span>
@@ -316,19 +331,19 @@ const MessagesSection = () => {
                     <div className={`font-medium truncate ${
                       selectedTeacher?._id === teacher._id
                         ? darkMode
-                          ? 'text-indigo-300'
-                          : 'text-indigo-600'
+                          ? 'text-blue-300'
+                          : 'text-blue-600'
                         : darkMode
-                          ? 'text-white'
-                          : 'text-gray-900'
+                          ? 'text-gray-100'
+                          : 'text-gray-800'
                     }`}>
                       {teacher.firstName} {teacher.lastName}
                     </div>
                     <div className={`text-sm truncate ${
                       selectedTeacher?._id === teacher._id
                         ? darkMode
-                          ? 'text-indigo-300/70'
-                          : 'text-indigo-600/70'
+                          ? 'text-blue-300/70'
+                          : 'text-blue-600/70'
                         : darkMode
                           ? 'text-gray-400'
                           : 'text-gray-500'
@@ -342,53 +357,70 @@ const MessagesSection = () => {
         </div>
 
         {/* Zone des messages */}
-        <div className={`${
-          !selectedTeacher ? 'hidden md:flex' : 'flex'
-        } flex-1 flex-col h-full overflow-hidden`}>
-          {selectedTeacher ? (
-            <>
-              {/* En-tête de la conversation */}
-              <div className={`p-6 border-b border-opacity-10 ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex items-center gap-4`}>
-                <button
-                  onClick={() => setSelectedTeacher(null)}
-                  className="md:hidden p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                  <FiMenu className={`w-6 h-6 ${darkMode ? 'text-white' : 'text-gray-600'}`} />
-                </button>
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                  darkMode ? 'bg-gray-700' : 'bg-indigo-100'
-                }`}>
-                  <span className={`text-lg font-medium ${
-                    darkMode ? 'text-white' : 'text-indigo-600'
+        <div className="flex-1 flex flex-col">
+          {/* En-tête fixe avec les informations de contact */}
+          {selectedTeacher && (
+            <div className={`sticky top-0 z-10 p-4 border-b ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                    darkMode ? 'bg-gray-700' : 'bg-gray-100'
                   }`}>
-                    {`${selectedTeacher.firstName[0]}${selectedTeacher.lastName[0]}`.toUpperCase()}
-                  </span>
-                </div>
-                <div>
-                  <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {selectedTeacher.firstName} {selectedTeacher.lastName}
-                  </h2>
-                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    {selectedTeacher.speciality}
-                  </p>
+                    {selectedTeacher.photoURL ? (
+                      <img
+                        src={selectedTeacher.photoURL}
+                        alt={`${selectedTeacher.firstName} ${selectedTeacher.lastName}`}
+                        className="w-full h-full object-cover rounded-full"
+                      />
+                    ) : (
+                      <span className={`text-lg font-medium ${
+                        darkMode ? 'text-white' : 'text-gray-700'
+                      }`}>
+                        {`${selectedTeacher.firstName[0]}${selectedTeacher.lastName[0]}`.toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {selectedTeacher.firstName} {selectedTeacher.lastName}
+                    </h3>
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {selectedTeacher.email}
+                    </p>
+                  </div>
                 </div>
               </div>
-
-              {/* Messages */}
-              <div
-                ref={messagesContainerRef}
-                className="flex-1 overflow-y-auto px-6 py-4"
-                style={{ height: 'calc(100vh - 16rem)' }}
-                onScroll={handleScroll}
-              >
+            </div>
+          )}
+          
+          {/* Zone de défilement des messages */}
+          <div 
+            ref={messagesContainerRef}
+            className={`flex-1 overflow-y-auto ${darkMode ? 'bg-gray-800/90' : 'bg-slate-50/30'} px-6 border-l ${darkMode ? 'border-gray-700/50' : 'border-gray-200'}`}
+            style={{ scrollBehavior: 'smooth' }}
+          >
+            {selectedTeacher ? (
+              <>
+                {/* Messages */}
                 <div className="space-y-4">
                   {messages.map((message, index) => {
                     const isCurrentUser = message.senderId.role === 'manager';
                     const isUnread = !message.readBy?.includes(selectedTeacher._id) && !isCurrentUser;
                     const isFirstUnread = message._id === firstUnreadMessageId;
+                    const showDateDivider = shouldShowDate(message, messages[index - 1]);
 
                     return (
                       <React.Fragment key={message._id}>
+                        {showDateDivider && (
+                          <div className="relative flex items-center justify-center my-6">
+                            <div className={`absolute w-full ${darkMode ? 'border-t border-gray-700/50' : 'border-t border-gray-200'}`}></div>
+                            <span className={`px-4 py-1 text-sm font-medium z-10 rounded-full ${
+                              darkMode ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-500'
+                            }`}>
+                              {formatDate(message.createdAt)}
+                            </span>
+                          </div>
+                        )}
                         <AnimatePresence>
                           {isFirstUnread && showUnreadMarker && (
                             <motion.div
@@ -402,7 +434,7 @@ const MessagesSection = () => {
                               }}
                               className="relative flex items-center justify-center my-6"
                             >
-                              <div className={`absolute w-full ${darkMode ? 'border-t border-gray-700' : 'border-t border-gray-200'}`}></div>
+                              <div className={`absolute w-full ${darkMode ? 'border-t border-gray-700' : 'border-t border-gray-100'}`}></div>
                               <span className={`px-4 text-xs font-medium z-10 rounded-full ${
                                 darkMode ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-500'
                               }`}>
@@ -416,7 +448,7 @@ const MessagesSection = () => {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.3 }}
                           className={`flex ${
-                            isCurrentUser ? 'justify-end' : 'justify-start'
+                            isCurrentUser ? 'justify-end mr-4' : 'justify-start ml-4'
                           } mb-4`}
                         >
                           <div
@@ -425,16 +457,23 @@ const MessagesSection = () => {
                             } max-w-[80%]`}
                           >
                             <div
-                              className={`rounded-2xl px-4 py-2 min-w-[120px] break-words ${
-                                !isCurrentUser
-                                  ? `${darkMode ? 'bg-indigo-500/90' : 'bg-indigo-400'} text-white`
-                                  : `${
-                                      darkMode ? 'bg-gray-700' : 'bg-gray-100'
-                                    } ${darkMode ? 'text-white' : 'text-gray-900'}`
-                              }`}
-                            >
+                              className={`rounded-lg px-6 py-3 max-w-[80%] break-words ${
+                                isCurrentUser
+                                  ? darkMode
+                                    ? 'bg-gray-700/80 text-gray-100'
+                                    : 'bg-gray-100 text-gray-800'
+                                  : darkMode
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-blue-500 text-white'
+                              }`}>
                               <div className="mb-2">{message.content}</div>
-                              <div className={`text-xs ${isCurrentUser ? 'text-stone-700' : 'text-white/80'} text-right flex items-center justify-end gap-1`}>
+                              <div className={`text-xs ${
+                                isCurrentUser 
+                                  ? darkMode 
+                                    ? 'text-gray-400'
+                                    : 'text-gray-500'
+                                  : 'text-white/80'
+                              } text-right flex items-center justify-end gap-1`}>
                                 <span>{formatTime(message.createdAt)}</span>
                                 {isCurrentUser && (
                                   <div className="flex items-center ml-1">
@@ -464,49 +503,49 @@ const MessagesSection = () => {
                   })}
                   <div ref={messagesEndRef} style={{ height: '1px' }} />
                 </div>
-              </div>
 
-              {/* Formulaire d'envoi */}
-              <div className={`p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'} border-t border-opacity-10 ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                <form onSubmit={handleSendMessage} className="flex gap-4">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Écrivez votre message..."
-                    className={`flex-1 px-6 py-3 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 ${
-                      darkMode
-                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                        : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-500'
-                    } border`}
-                  />
-                  <button
-                    type="submit"
-                    className={`px-6 py-3 rounded-xl flex items-center gap-2 transition-all duration-200 ${
-                      darkMode
-                        ? 'bg-indigo-600 hover:bg-indigo-700'
-                        : 'bg-indigo-500 hover:bg-indigo-600'
-                    } text-white shadow-lg hover:shadow-xl disabled:opacity-50 disabled:shadow-none`}
-                    disabled={!newMessage.trim()}
-                  >
-                    <FiSend className="w-5 h-5" />
-                    <span className="hidden sm:inline">Envoyer</span>
-                  </button>
-                </form>
+                {/* Formulaire d'envoi */}
+                <div className={`p-6 ${darkMode ? 'bg-gray-800/90' : 'bg-white'} border-t border-opacity-10 ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                  <form onSubmit={handleSendMessage} className="flex gap-4">
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Écrivez votre message..."
+                      className={`flex-1 px-6 py-3 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200 ${
+                        darkMode
+                          ? 'bg-gray-700/80 border-gray-600 text-gray-100 placeholder-gray-400'
+                          : 'bg-slate-50 border-gray-200 text-gray-800 placeholder-gray-500'
+                      } border`}
+                    />
+                    <button
+                      type="submit"
+                      className={`px-6 py-3 rounded-xl flex items-center gap-2 transition-all duration-200 ${
+                        darkMode
+                          ? 'bg-blue-600 hover:bg-blue-700'
+                          : 'bg-blue-500 hover:bg-blue-600'
+                      } text-white shadow-lg hover:shadow-xl disabled:opacity-50 disabled:shadow-none`}
+                      disabled={!newMessage.trim()}
+                    >
+                      <FiSend className="w-5 h-5" />
+                      <span className="hidden sm:inline">Envoyer</span>
+                    </button>
+                  </form>
+                </div>
+              </>
+            ) : (
+              <div className={`flex-1 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-800/90' : 'bg-slate-50/30'}`}>
+                <div className={`w-16 h-16 rounded-xl flex items-center justify-center mb-4 ${
+                  darkMode ? 'bg-gray-800' : 'bg-white'
+                }`}>
+                  <FiMessageCircle className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`} size={32} />
+                </div>
+                <p className={`text-lg ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Sélectionnez un professeur pour démarrer une conversation
+                </p>
               </div>
-            </>
-          ) : (
-            <div className={`flex-1 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-              <div className={`w-16 h-16 rounded-xl flex items-center justify-center mb-4 ${
-                darkMode ? 'bg-gray-800' : 'bg-white'
-              }`}>
-                <FiMessageCircle className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`} size={32} />
-              </div>
-              <p className={`text-lg ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                Sélectionnez un professeur pour démarrer une conversation
-              </p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
