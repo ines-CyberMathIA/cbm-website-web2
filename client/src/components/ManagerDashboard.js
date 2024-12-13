@@ -462,22 +462,6 @@ const ManagerDashboard = () => {
       <div className="flex h-[calc(100vh-4rem)]">
         {/* Sidebar moderne */}
         <div className={`w-64 ${darkMode ? 'bg-gray-800' : 'bg-white'} border-r ${darkMode ? 'border-gray-700' : 'border-gray-200'} transition-colors duration-200`}>
-          <div className="p-4">
-            <button
-              onClick={() => setShowTeacherModal(true)}
-              className={`w-full flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-medium ${
-                darkMode
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              } transition-colors duration-200 shadow-sm`}
-            >
-              <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-              </svg>
-              Inviter un professeur
-            </button>
-          </div>
-
           <nav className="mt-4 px-2">
             <button
               onClick={() => {
@@ -527,7 +511,11 @@ const ManagerDashboard = () => {
           <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
             <div className="animate-fadeIn">
               {activeSection === 'teachers' && (
-                <TeachersList onTeacherClick={handleTeacherClick} />
+                <TeachersList
+                  onTeacherClick={handleTeacherClick}
+                  isDarkMode={darkMode}
+                  onInviteClick={() => setShowTeacherModal(true)}
+                />
               )}
               {activeSection === 'teacherDetails' && <TeacherDetails />}
               {activeSection === 'messages' && <MessagesSection />}

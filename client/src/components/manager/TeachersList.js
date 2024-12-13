@@ -51,7 +51,7 @@ const formatLevel = (level) => {
   return mapping[level] || level;
 };
 
-const TeachersList = ({ onTeacherClick, isDarkMode }) => {
+const TeachersList = ({ onTeacherClick, isDarkMode, onInviteClick }) => {
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -247,152 +247,40 @@ const TeachersList = ({ onTeacherClick, isDarkMode }) => {
         </div>
       )}
 
-      {/* Section des professeurs actifs */}
-      <div className="transform transition-all duration-300 hover:translate-y-[-2px]">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} flex items-center space-x-3`}>
-            <span className={`inline-block w-2 h-2 rounded-full ${isDarkMode ? 'bg-green-400' : 'bg-green-500'} animate-pulse`}></span>
-            <span>Professeurs actifs</span>
-          </h2>
-          <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-            {teachers.filter(t => t.status === 'active').length} professeur(s)
-          </span>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className={`text-2xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            Professeurs
+          </h1>
+          <p className={`mt-1 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            Gérez vos professeurs et leurs invitations
+          </p>
         </div>
-        
-        <div className={`
-          overflow-hidden rounded-xl border
-          ${isDarkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-white'}
-          shadow-lg backdrop-blur-sm
-          transition-all duration-300 hover:shadow-xl
-        `}>
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className={`${isDarkMode ? 'bg-gray-800/80' : 'bg-gray-50'}`}>
-              <tr>
-                <th scope="col" className={`px-6 py-4 text-left text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                  Professeur
-                </th>
-                <th scope="col" className={`px-6 py-4 text-left text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                  Spécialité
-                </th>
-                <th scope="col" className={`px-6 py-4 text-left text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                  Niveaux
-                </th>
-                <th scope="col" className={`px-6 py-4 text-left text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className={`${isDarkMode ? 'bg-gray-900/50' : 'bg-white'} divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-              {loading ? (
-                <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center">
-                    <div className="flex items-center justify-center space-x-3">
-                      <div className={`animate-spin rounded-full h-6 w-6 border-2 ${isDarkMode ? 'border-blue-500' : 'border-indigo-600'} border-t-transparent`}></div>
-                      <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Chargement des professeurs...
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              ) : teachers.filter(t => t.status === 'active').length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center">
-                    <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      Aucun professeur actif
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                teachers
-                  .filter(teacher => teacher.status === 'active')
-                  .map((teacher) => (
-                    <tr 
-                      key={teacher._id}
-                      className={`
-                        group hover:${isDarkMode ? 'bg-gray-800/70' : 'bg-gray-50'} 
-                        cursor-pointer transition-all duration-200
-                      `}
-                      onClick={() => onTeacherClick(teacher)}
-                    >
-                      <td className="px-6 py-5 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className={`
-                            h-12 w-12 rounded-xl
-                            ${isDarkMode ? 'bg-blue-900/30 group-hover:bg-blue-900/50' : 'bg-blue-100 group-hover:bg-blue-200'}
-                            flex items-center justify-center
-                            transition-all duration-200
-                          `}>
-                            <span className={`text-lg font-medium ${isDarkMode ? 'text-blue-300' : 'text-blue-700'}`}>
-                              {teacher.firstName.charAt(0)}{teacher.lastName.charAt(0)}
-                            </span>
-                          </div>
-                          <div className="ml-4">
-                            <div className={`text-sm font-semibold ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`}>
-                              {teacher.firstName} {teacher.lastName}
-                            </div>
-                            <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                              {teacher.email}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-5 whitespace-nowrap">
-                        <span className={`
-                          px-3 py-1.5 inline-flex items-center
-                          text-xs font-medium rounded-full
-                          transition-all duration-200
-                          ${isDarkMode 
-                            ? 'bg-purple-900/30 text-purple-300 group-hover:bg-purple-900/50' 
-                            : 'bg-purple-100 text-purple-800 group-hover:bg-purple-200'}
-                        `}>
-                          {formatSpeciality(teacher.speciality)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-5 whitespace-nowrap">
-                        <div className="flex flex-wrap gap-2">
-                          {teacher.level.map((level) => (
-                            <span
-                              key={level}
-                              className={`
-                                px-3 py-1.5 inline-flex items-center
-                                text-xs font-medium rounded-full
-                                transition-all duration-200
-                                ${isDarkMode 
-                                  ? 'bg-green-900/30 text-green-300 group-hover:bg-green-900/50' 
-                                  : 'bg-green-100 text-green-800 group-hover:bg-green-200'}
-                              `}
-                            >
-                              {formatLevel(level)}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-6 py-5 whitespace-nowrap text-right">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onTeacherClick(teacher);
-                          }}
-                          className={`
-                            inline-flex items-center px-4 py-2 rounded-lg
-                            text-sm font-medium
-                            transition-all duration-200
-                            ${isDarkMode 
-                              ? 'bg-blue-900/30 text-blue-300 hover:bg-blue-900/50' 
-                              : 'bg-blue-100 text-blue-800 hover:bg-blue-200'}
-                          `}
-                        >
-                          <span>Voir détails</span>
-                          <svg className="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-              )}
-            </tbody>
-          </table>
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={handleRefresh}
+            className={`p-2 rounded-lg transition-colors duration-200 ${
+              isDarkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-600'
+            }`}
+            title="Rafraîchir la liste"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+          <button
+            onClick={onInviteClick}
+            className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium text-white ${
+              isDarkMode
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-blue-600 hover:bg-blue-700'
+            } transition-colors duration-200 shadow-sm`}
+          >
+            <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+            </svg>
+            Inviter un professeur
+          </button>
         </div>
       </div>
 
@@ -409,7 +297,7 @@ const TeachersList = ({ onTeacherClick, isDarkMode }) => {
         </div>
 
         <div className={`
-          overflow-hidden rounded-xl border
+          overflow-hidden rounded-xl border mb-12
           ${isDarkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-white'}
           shadow-lg backdrop-blur-sm
           transition-all duration-300 hover:shadow-xl
@@ -571,6 +459,155 @@ const TeachersList = ({ onTeacherClick, isDarkMode }) => {
                             Annuler
                           </button>
                         </div>
+                      </td>
+                    </tr>
+                  ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Section des professeurs actifs */}
+      <div className="transform transition-all duration-300 hover:translate-y-[-2px]">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} flex items-center space-x-3`}>
+            <span className={`inline-block w-2 h-2 rounded-full ${isDarkMode ? 'bg-green-400' : 'bg-green-500'} animate-pulse`}></span>
+            <span>Professeurs actifs</span>
+          </h2>
+          <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            {teachers.filter(t => t.status === 'active').length} professeur(s)
+          </span>
+        </div>
+        
+        <div className={`
+          overflow-hidden rounded-xl border
+          ${isDarkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-white'}
+          shadow-lg backdrop-blur-sm
+          transition-all duration-300 hover:shadow-xl
+        `}>
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className={`${isDarkMode ? 'bg-gray-800/80' : 'bg-gray-50'}`}>
+              <tr>
+                <th scope="col" className={`px-6 py-4 text-left text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
+                  Professeur
+                </th>
+                <th scope="col" className={`px-6 py-4 text-left text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
+                  Spécialité
+                </th>
+                <th scope="col" className={`px-6 py-4 text-left text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
+                  Niveaux
+                </th>
+                <th scope="col" className={`px-6 py-4 text-left text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className={`${isDarkMode ? 'bg-gray-900/50' : 'bg-white'} divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
+              {loading ? (
+                <tr>
+                  <td colSpan="4" className="px-6 py-8 text-center">
+                    <div className="flex items-center justify-center space-x-3">
+                      <div className={`animate-spin rounded-full h-6 w-6 border-2 ${isDarkMode ? 'border-blue-500' : 'border-indigo-600'} border-t-transparent`}></div>
+                      <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Chargement des professeurs...
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ) : teachers.filter(t => t.status === 'active').length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="px-6 py-8 text-center">
+                    <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Aucun professeur actif
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                teachers
+                  .filter(teacher => teacher.status === 'active')
+                  .map((teacher) => (
+                    <tr 
+                      key={teacher._id}
+                      className={`
+                        group hover:${isDarkMode ? 'bg-gray-800/70' : 'bg-gray-50'} 
+                        cursor-pointer transition-all duration-200
+                      `}
+                      onClick={() => onTeacherClick(teacher)}
+                    >
+                      <td className="px-6 py-5 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className={`
+                            h-12 w-12 rounded-xl
+                            ${isDarkMode ? 'bg-blue-900/30 group-hover:bg-blue-900/50' : 'bg-blue-100 group-hover:bg-blue-200'}
+                            flex items-center justify-center
+                            transition-all duration-200
+                          `}>
+                            <span className={`text-lg font-medium ${isDarkMode ? 'text-blue-300' : 'text-blue-700'}`}>
+                              {teacher.firstName.charAt(0)}{teacher.lastName.charAt(0)}
+                            </span>
+                          </div>
+                          <div className="ml-4">
+                            <div className={`text-sm font-semibold ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`}>
+                              {teacher.firstName} {teacher.lastName}
+                            </div>
+                            <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                              {teacher.email}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 whitespace-nowrap">
+                        <span className={`
+                          px-3 py-1.5 inline-flex items-center
+                          text-xs font-medium rounded-full
+                          transition-all duration-200
+                          ${isDarkMode 
+                            ? 'bg-purple-900/30 text-purple-300 group-hover:bg-purple-900/50' 
+                            : 'bg-purple-100 text-purple-800 group-hover:bg-purple-200'}
+                        `}>
+                          {formatSpeciality(teacher.speciality)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-5 whitespace-nowrap">
+                        <div className="flex flex-wrap gap-2">
+                          {teacher.level.map((level) => (
+                            <span
+                              key={level}
+                              className={`
+                                px-3 py-1.5 inline-flex items-center
+                                text-xs font-medium rounded-full
+                                transition-all duration-200
+                                ${isDarkMode 
+                                  ? 'bg-green-900/30 text-green-300 group-hover:bg-green-900/50' 
+                                  : 'bg-green-100 text-green-800 group-hover:bg-green-200'}
+                              `}
+                            >
+                              {formatLevel(level)}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 whitespace-nowrap text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onTeacherClick(teacher);
+                          }}
+                          className={`
+                            inline-flex items-center px-4 py-2 rounded-lg
+                            text-sm font-medium
+                            transition-all duration-200
+                            ${isDarkMode 
+                              ? 'bg-blue-900/30 text-blue-300 hover:bg-blue-900/50' 
+                              : 'bg-blue-100 text-blue-800 hover:bg-blue-200'}
+                          `}
+                        >
+                          <span>Voir détails</span>
+                          <svg className="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
                       </td>
                     </tr>
                   ))
