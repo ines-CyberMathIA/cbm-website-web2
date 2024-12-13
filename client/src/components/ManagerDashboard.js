@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import TeachersList from './manager/TeachersList';
 import MessagesSection from './manager/MessagesSection';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 // Ajouter le composant TeacherModal
 const TeacherModal = ({ onClose, setError }) => {
@@ -326,11 +328,14 @@ const TeacherModal = ({ onClose, setError }) => {
 const ManagerDashboard = () => {
   const navigate = useNavigate();
   const user = JSON.parse(sessionStorage.getItem('user'));
+  const { darkMode, toggleTheme } = useTheme();
+  const { user: authUser } = useAuth();
+
   const [activeSection, setActiveSection] = useState('teachers');
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [error, setError] = useState('');
-  const { darkMode, toggleTheme } = useTheme();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Vérification de l'authentification
   React.useEffect(() => {
@@ -361,55 +366,42 @@ const ManagerDashboard = () => {
     setActiveSection('teacherDetails');
   };
 
-  // Composant pour afficher les détails d'un professeur
-  const TeacherDetails = () => {
-    const [availabilities, setAvailabilities] = useState([]);
-    
-    useEffect(() => {
-      const fetchAvailabilities = async () => {
-        if (!selectedTeacher) return;
-        
-        try {
-          const token = sessionStorage.getItem('token');
-          if (!token) {
-            throw new Error('Token manquant - veuillez vous reconnecter');
-          }
-
-          const response = await axios.get(
-            `http://localhost:5000/api/manager/teacher/${selectedTeacher._id}/availabilities`,
-            {
-              headers: { Authorization: `Bearer ${token}` }
-            }
-          );
-          setAvailabilities(response.data);
-        } catch (error) {
-          console.error('Erreur lors du chargement des disponibilités:', error);
-          if (error.message.includes('Token manquant')) {
-            window.location.href = '/login';
-          }
-        }
-      };
-
-      fetchAvailabilities();
-    }, [selectedTeacher]);
-
-    if (!selectedTeacher) return null;
-
-    // ... reste du code de TeacherDetails ...
-  };
-
   return (
     <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-200`}>
       {/* Navbar moderne */}
       <nav className={`${darkMode ? 'bg-gray-800' : 'bg-white'} border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} transition-colors duration-200`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
-            <div className="flex">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className={`
+                  p-2 rounded-lg
+                  text-gray-400 hover:text-gray-500
+                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500
+                  transition-colors duration-200
+                `}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className={`h-6 w-6 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d={isMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}
+                  />
+                </svg>
+              </button>
               <div className="flex-shrink-0 flex items-center">
                 <span className={`text-2xl font-bold ${
                   darkMode 
-                    ? 'bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-500'
-                    : 'bg-gradient-to-r from-blue-600 via-cyan-600 to-purple-600'
+                    ? 'bg-gradient-to-r from-blue-400 via-pink-400 to-purple-400'
+                    : 'bg-gradient-to-r from-blue-600 via-pink-600 to-purple-600'
                 } bg-clip-text text-transparent drop-shadow-sm`}>
                   CyberMathIA
                 </span>
@@ -438,7 +430,7 @@ const ManagerDashboard = () => {
                   </svg>
                 </div>
                 <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  {user?.firstName} {user?.lastName}
+                  {authUser?.firstName} {authUser?.lastName}
                 </span>
               </div>
               <button
@@ -459,80 +451,140 @@ const ManagerDashboard = () => {
         </div>
       </nav>
 
-      <div className="flex h-[calc(100vh-4rem)]">
-        {/* Sidebar moderne */}
-        <div className={`w-64 ${darkMode ? 'bg-gray-800' : 'bg-white'} border-r ${darkMode ? 'border-gray-700' : 'border-gray-200'} transition-colors duration-200`}>
-          <nav className="mt-4 px-2">
-            <button
-              onClick={() => {
-                setActiveSection('teachers');
-                setSelectedTeacher(null);
-              }}
-              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                activeSection === 'teachers'
-                  ? darkMode
-                    ? 'bg-gray-700 text-white'
-                    : 'bg-blue-50 text-blue-700'
-                  : darkMode
-                    ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                    : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-              }`}
+      {/* Menu overlay */}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/10 backdrop-blur-sm z-40 flex items-center justify-center"
+            onClick={() => setIsMenuOpen(false)}
+          >
+            {/* Menu content */}
+            <motion.div
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -20, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="w-80 rounded-xl overflow-hidden bg-transparent"
+              onClick={e => e.stopPropagation()}
             >
-              <svg className="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
-              </svg>
-              Liste des professeurs
-            </button>
-            <button
-              onClick={() => {
-                setActiveSection('messages');
-                setSelectedTeacher(null);
-              }}
-              className={`w-full mt-2 flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                activeSection === 'messages'
-                  ? darkMode
-                    ? 'bg-gray-700 text-white'
-                    : 'bg-blue-50 text-blue-700'
-                  : darkMode
-                    ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                    : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-              }`}
-            >
-              <svg className="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-              </svg>
-              Messages
-            </button>
-          </nav>
-        </div>
+              <div className="py-4 flex flex-col items-center space-y-4">
+                <button
+                  onClick={() => {
+                    setActiveSection('teachers');
+                    setIsMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-center space-x-4 px-6 py-4 rounded-xl
+                    group relative text-lg transition-all duration-500
+                    ${activeSection === 'teachers'
+                      ? darkMode 
+                        ? 'bg-cyan-500/10 text-white'
+                        : 'bg-cyan-500/5 text-gray-900'
+                      : darkMode
+                        ? 'text-gray-200 hover:text-white hover:bg-gray-800'
+                        : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
+                    }
+                  `}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" 
+                    className={`h-7 w-7 transition-all duration-500 ${
+                      activeSection === 'teachers'
+                        ? darkMode
+                          ? '[filter:drop-shadow(0_0_8px_rgba(103,232,249,0.5))_drop-shadow(0_0_12px_rgba(34,211,238,0.4))_drop-shadow(0_0_16px_rgba(6,182,212,0.3))]'
+                          : '[filter:drop-shadow(0_0_8px_rgba(34,211,238,0.5))_drop-shadow(0_0_12px_rgba(8,145,178,0.4))_drop-shadow(0_0_16px_rgba(14,116,144,0.3))]'
+                        : darkMode
+                          ? 'group-hover:[filter:drop-shadow(0_0_8px_rgba(103,232,249,0.5))_drop-shadow(0_0_12px_rgba(34,211,238,0.4))_drop-shadow(0_0_16px_rgba(6,182,212,0.3))]'
+                          : 'group-hover:[filter:drop-shadow(0_0_8px_rgba(34,211,238,0.5))_drop-shadow(0_0_12px_rgba(8,145,178,0.4))_drop-shadow(0_0_16px_rgba(14,116,144,0.3))]'
+                    }`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                  <span className={`font-medium transition-all duration-500 ${
+                    activeSection === 'teachers'
+                      ? darkMode
+                        ? '[filter:drop-shadow(0_0_8px_rgba(103,232,249,0.5))_drop-shadow(0_0_12px_rgba(34,211,238,0.4))_drop-shadow(0_0_16px_rgba(6,182,212,0.3))]'
+                        : '[filter:drop-shadow(0_0_8px_rgba(34,211,238,0.5))_drop-shadow(0_0_12px_rgba(8,145,178,0.4))_drop-shadow(0_0_16px_rgba(14,116,144,0.3))]'
+                      : darkMode
+                        ? 'group-hover:[filter:drop-shadow(0_0_8px_rgba(103,232,249,0.5))_drop-shadow(0_0_12px_rgba(34,211,238,0.4))_drop-shadow(0_0_16px_rgba(6,182,212,0.3))]'
+                        : 'group-hover:[filter:drop-shadow(0_0_8px_rgba(34,211,238,0.5))_drop-shadow(0_0_12px_rgba(8,145,178,0.4))_drop-shadow(0_0_16px_rgba(14,116,144,0.3))]'
+                  }`}>Liste des professeurs</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveSection('messages');
+                    setIsMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-center space-x-4 px-6 py-4 rounded-xl
+                    group relative text-lg transition-all duration-500
+                    ${activeSection === 'messages'
+                      ? darkMode 
+                        ? 'bg-cyan-500/10 text-white'
+                        : 'bg-cyan-500/5 text-gray-900'
+                      : darkMode
+                        ? 'text-gray-200 hover:text-white hover:bg-gray-800'
+                        : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
+                    }
+                  `}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" 
+                    className={`h-7 w-7 transition-all duration-500 ${
+                      activeSection === 'messages'
+                        ? darkMode
+                          ? '[filter:drop-shadow(0_0_8px_rgba(103,232,249,0.5))_drop-shadow(0_0_12px_rgba(34,211,238,0.4))_drop-shadow(0_0_16px_rgba(6,182,212,0.3))]'
+                          : '[filter:drop-shadow(0_0_8px_rgba(34,211,238,0.5))_drop-shadow(0_0_12px_rgba(8,145,178,0.4))_drop-shadow(0_0_16px_rgba(14,116,144,0.3))]'
+                        : darkMode
+                          ? 'group-hover:[filter:drop-shadow(0_0_8px_rgba(103,232,249,0.5))_drop-shadow(0_0_12px_rgba(34,211,238,0.4))_drop-shadow(0_0_16px_rgba(6,182,212,0.3))]'
+                          : 'group-hover:[filter:drop-shadow(0_0_8px_rgba(34,211,238,0.5))_drop-shadow(0_0_12px_rgba(8,145,178,0.4))_drop-shadow(0_0_16px_rgba(14,116,144,0.3))]'
+                    }`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                  </svg>
+                  <span className={`font-medium transition-all duration-500 ${
+                    activeSection === 'messages'
+                      ? darkMode
+                        ? '[filter:drop-shadow(0_0_8px_rgba(103,232,249,0.5))_drop-shadow(0_0_12px_rgba(34,211,238,0.4))_drop-shadow(0_0_16px_rgba(6,182,212,0.3))]'
+                        : '[filter:drop-shadow(0_0_8px_rgba(34,211,238,0.5))_drop-shadow(0_0_12px_rgba(8,145,178,0.4))_drop-shadow(0_0_16px_rgba(14,116,144,0.3))]'
+                      : darkMode
+                        ? 'group-hover:[filter:drop-shadow(0_0_8px_rgba(103,232,249,0.5))_drop-shadow(0_0_12px_rgba(34,211,238,0.4))_drop-shadow(0_0_16px_rgba(6,182,212,0.3))]'
+                        : 'group-hover:[filter:drop-shadow(0_0_8px_rgba(34,211,238,0.5))_drop-shadow(0_0_12px_rgba(8,145,178,0.4))_drop-shadow(0_0_16px_rgba(14,116,144,0.3))]'
+                  }`}>Messages</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        {/* Contenu principal */}
-        <div className={`flex-1 overflow-auto ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-200`}>
-          <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-            <div className="animate-fadeIn">
-              {activeSection === 'teachers' && (
+      {/* Main content */}
+      <div className={`flex-1 overflow-auto transition-all duration-300 ${isMenuOpen ? 'filter blur-sm' : ''}`}>
+        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+          <div className="animate-fadeIn">
+            {activeSection === 'teachers' && (
+              <>
                 <TeachersList
                   onTeacherClick={handleTeacherClick}
                   isDarkMode={darkMode}
                   onInviteClick={() => setShowTeacherModal(true)}
                 />
-              )}
-              {activeSection === 'teacherDetails' && <TeacherDetails />}
-              {activeSection === 'messages' && <MessagesSection />}
-            </div>
+                {showTeacherModal && (
+                  <TeacherModal
+                    onClose={() => setShowTeacherModal(false)}
+                    setError={setError}
+                  />
+                )}
+              </>
+            )}
+            {activeSection === 'messages' && <MessagesSection />}
           </div>
         </div>
       </div>
-
-      {/* Modal */}
-      {showTeacherModal && (
-        <TeacherModal
-          onClose={() => setShowTeacherModal(false)}
-          setError={setError}
-        />
-      )}
     </div>
   );
 };
 
-export default ManagerDashboard; 
+export default ManagerDashboard;
