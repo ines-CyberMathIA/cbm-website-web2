@@ -357,7 +357,7 @@ const MessagesSection = () => {
         </div>
 
         {/* Zone des messages */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col relative">
           {/* En-tête fixe avec les informations de contact */}
           {selectedTeacher && (
             <div className={`sticky top-0 z-10 p-4 border-b ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
@@ -396,7 +396,7 @@ const MessagesSection = () => {
           {/* Zone de défilement des messages */}
           <div 
             ref={messagesContainerRef}
-            className={`flex-1 overflow-y-auto ${darkMode ? 'bg-gray-800/90' : 'bg-slate-50/30'} px-6 border-l ${darkMode ? 'border-gray-700/50' : 'border-gray-200'}`}
+            className={`flex-1 overflow-y-auto ${darkMode ? 'bg-gray-800/90' : 'bg-slate-50/30'} px-6 border-l ${darkMode ? 'border-gray-700/50' : 'border-gray-200'} pb-24`}
             style={{ scrollBehavior: 'smooth' }}
           >
             {selectedTeacher ? (
@@ -505,7 +505,7 @@ const MessagesSection = () => {
                 </div>
 
                 {/* Formulaire d'envoi */}
-                <div className={`p-6 ${darkMode ? 'bg-gray-800/90' : 'bg-white'} border-t border-opacity-10 ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                <div className={`absolute bottom-0 left-0 right-0 p-6 ${darkMode ? 'bg-gray-800/90' : 'bg-white'} border-t border-opacity-10 ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
                   <form onSubmit={handleSendMessage} className="flex gap-4">
                     <input
                       type="text"
