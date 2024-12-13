@@ -167,33 +167,157 @@ const Messages = ({ isDarkMode }) => {
 
   // Charger les messages du canal actif
   const fetchMessages = async () => {
-    if (!activeChannel?._id) return;
+    if (!activeChannel?._id || !currentUserId) return;
 
     try {
       const response = await axios.get(
         `${config.API_URL}/api/messages/channel/${activeChannel._id}`,
         getAxiosConfig()
       );
-      
+
       // Trouver le premier message non lu
       const firstUnread = response.data.find(msg => 
-        !msg.readBy?.includes(currentUserId) && 
-        msg.senderId._id !== currentUserId
+        msg.senderId._id !== currentUserId && !msg.readBy?.includes(currentUserId)
       );
 
+      // Mettre à jour les messages et le marqueur des non lus
       setMessages(response.data);
       
       if (firstUnread) {
         setFirstUnreadMessageId(firstUnread._id);
         setShowUnreadMarker(true);
+
+        // Scroll vers les messages non lus après un court délai
+        setTimeout(() => {
+          scrollToUnread();
+        }, 100);
+
+        // Marquer les messages comme lus après un délai plus long
+        const unreadMessages = response.data
+          .filter(msg => msg.senderId._id !== currentUserId && !msg.readBy?.includes(currentUserId))
+          .map(msg => msg._id);
+
+        if (unreadMessages.length > 0) {
+          setTimeout(async () => {
+            try {
+              await axios.post(
+                `${config.API_URL}/api/messages/markAsRead`,
+                {
+                  messageIds: unreadMessages,
+                  channelId: activeChannel._id
+                },
+                getAxiosConfig()
+              );
+
+              // Mettre à jour l'état local des messages avec les messages marqués comme lus
+              setMessages(prevMessages => 
+                prevMessages.map(msg => 
+                  unreadMessages.includes(msg._id)
+                    ? { ...msg, readBy: [...(msg.readBy || []), currentUserId] }
+                    : msg
+                )
+              );
+              setFirstUnreadMessageId(null);
+              setShowUnreadMarker(false);
+            } catch (error) {
+              console.error('Erreur lors du marquage des messages comme lus:', error);
+            }
+          }, 3000); // Augmenté à 3 secondes pour plus de visibilité
+        }
       } else {
-        setFirstUnreadMessageId(null);
-        setShowUnreadMarker(false);
+        // S'il n'y a pas de messages non lus, scroll en bas
+        setTimeout(() => {
+          scrollToBottom();
+        }, 100);
       }
     } catch (error) {
       console.error('Erreur lors du chargement des messages:', error);
     }
   };
+
+  // Mettre à jour les messages périodiquement
+  useEffect(() => {
+    if (!activeChannel?._id || !currentUserId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await axios.get(
+          `${config.API_URL}/api/messages/channel/${activeChannel._id}`,
+          getAxiosConfig()
+        );
+
+        const hasNewUnreadMessages = response.data.some(msg => 
+          msg.senderId._id !== currentUserId && 
+          !msg.readBy?.includes(currentUserId) &&
+          !messages.find(m => m._id === msg._id)
+        );
+
+        // Mettre à jour les messages
+        setMessages(response.data);
+
+        // Si nouveaux messages non lus, montrer le marqueur
+        if (hasNewUnreadMessages) {
+          const firstUnread = response.data.find(msg => 
+            msg.senderId._id !== currentUserId && !msg.readBy?.includes(currentUserId)
+          );
+          if (firstUnread) {
+            setFirstUnreadMessageId(firstUnread._id);
+            setShowUnreadMarker(true);
+          }
+
+          // Marquer comme lu après délai
+          setTimeout(async () => {
+            const unreadMessages = response.data
+              .filter(msg => msg.senderId._id !== currentUserId && !msg.readBy?.includes(currentUserId))
+              .map(msg => msg._id);
+
+            if (unreadMessages.length > 0) {
+              try {
+                await axios.post(
+                  `${config.API_URL}/api/messages/markAsRead`,
+                  {
+                    messageIds: unreadMessages,
+                    channelId: activeChannel._id
+                  },
+                  getAxiosConfig()
+                );
+
+                setMessages(prevMessages => 
+                  prevMessages.map(msg => 
+                    unreadMessages.includes(msg._id)
+                      ? { ...msg, readBy: [...(msg.readBy || []), currentUserId] }
+                      : msg
+                  )
+                );
+                setFirstUnreadMessageId(null);
+                setShowUnreadMarker(false);
+              } catch (error) {
+                console.error('Erreur lors du marquage des messages comme lus:', error);
+              }
+            }
+          }, 3000);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la mise à jour des messages:', error);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [activeChannel?._id, currentUserId, messages]);
+
+  // Effet pour le scroll initial après chargement des messages
+  useEffect(() => {
+    if (messages.length > 0 && activeChannel) {
+      const timer = setTimeout(() => {
+        if (firstUnreadMessageId && showUnreadMarker) {
+          scrollToUnread();
+        } else {
+          scrollToBottom(); // Défiler en bas après l'envoi d'un message
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [messages, firstUnreadMessageId, showUnreadMarker, activeChannel]);
 
   // État pour suivre si l'utilisateur a scrollé manuellement
   const [userHasScrolled, setUserHasScrolled] = useState(false);
@@ -216,38 +340,6 @@ const Messages = ({ isDarkMode }) => {
       container.scrollTop = unreadElement.offsetTop - 100; // 100px de marge en haut
     }
   }, []);
-
-  // Effet pour le scroll initial après chargement des messages
-  useEffect(() => {
-    if (messages.length > 0 && activeChannel) {
-      const timer = setTimeout(() => {
-        if (firstUnreadMessageId && showUnreadMarker) {
-          scrollToUnread();
-        } else {
-          scrollToBottom();
-        }
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [activeChannel?._id]); // Uniquement lors du changement de conversation
-
-  // Mettre à jour les messages périodiquement sans forcer le scroll
-  useEffect(() => {
-    if (activeChannel?._id) {
-      const interval = setInterval(async () => {
-        try {
-          const response = await axios.get(
-            `${config.API_URL}/api/messages/channel/${activeChannel._id}`,
-            getAxiosConfig()
-          );
-          setMessages(response.data);
-        } catch (error) {
-          console.error('Erreur lors de la mise à jour des messages:', error);
-        }
-      }, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [activeChannel?._id]);
 
   // Envoyer un nouveau message
   const sendMessage = async (e) => {

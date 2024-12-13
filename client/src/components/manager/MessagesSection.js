@@ -91,35 +91,64 @@ const MessagesSection = () => {
           `http://localhost:5000/api/messages/channel/${selectedChannel._id}`,
           getAxiosConfig()
         );
-        
+
         // Trouver le premier message non lu
         const firstUnread = response.data.find(msg => 
           msg.senderId._id !== currentUserId && !msg.readBy?.includes(currentUserId)
         );
 
         setMessages(response.data);
-        setFirstUnreadMessageId(firstUnread?._id);
-        setShowUnreadMarker(true);
+        if (firstUnread) {
+          setFirstUnreadMessageId(firstUnread._id);
+          setShowUnreadMarker(true);
+        }
 
-        // Scroll initial uniquement lors de la sélection d'un professeur
-        const timer = setTimeout(() => {
-          if (firstUnread) {
-            scrollToUnread();
-          } else {
-            scrollToBottom();
-          }
-        }, 100);
+        // Marquer les messages comme lus après un court délai
+        const unreadMessages = response.data
+          .filter(msg => msg.senderId._id !== currentUserId && !msg.readBy?.includes(currentUserId))
+          .map(msg => msg._id);
 
-        return () => clearTimeout(timer);
+        if (unreadMessages.length > 0) {
+          // Attendre un peu avant de marquer comme lu pour que l'utilisateur puisse voir le marqueur
+          setTimeout(async () => {
+            try {
+              await axios.post(
+                'http://localhost:5000/api/messages/markAsRead',
+                {
+                  messageIds: unreadMessages,
+                  channelId: selectedChannel._id
+                },
+                getAxiosConfig()
+              );
+
+              // Mettre à jour l'état local des messages avec les messages marqués comme lus
+              setMessages(prevMessages => 
+                prevMessages.map(msg => 
+                  unreadMessages.includes(msg._id)
+                    ? { ...msg, readBy: [...(msg.readBy || []), currentUserId] }
+                    : msg
+                )
+              );
+              setFirstUnreadMessageId(null);
+              setShowUnreadMarker(false);
+            } catch (error) {
+              console.error('Erreur lors du marquage des messages comme lus:', error);
+            }
+          }, 2000); // Attendre 2 secondes avant de marquer comme lu
+        }
+
       } catch (error) {
         console.error('Erreur lors du chargement des messages:', error);
       }
     };
 
     fetchMessages();
-    setUserHasScrolled(false); // Réinitialiser le scroll lors du changement de professeur
+  }, [selectedChannel, currentUserId]);
 
-    // Mise à jour périodique sans forcer le scroll
+  // Mettre à jour les messages périodiquement
+  useEffect(() => {
+    if (!selectedChannel || !currentUserId) return;
+
     const interval = setInterval(async () => {
       try {
         const response = await axios.get(
@@ -127,22 +156,44 @@ const MessagesSection = () => {
           getAxiosConfig()
         );
         
-        // Mettre à jour les messages sans forcer le scroll
-        setMessages(prevMessages => {
-          // Si pas de changement, garder la même référence
-          if (prevMessages.length === response.data.length &&
-              prevMessages[prevMessages.length - 1]._id === response.data[response.data.length - 1]._id) {
-            return prevMessages;
+        // Mettre à jour les messages
+        setMessages(response.data);
+
+        // Marquer les nouveaux messages comme lus
+        const unreadMessages = response.data
+          .filter(msg => msg.senderId._id !== currentUserId && !msg.readBy?.includes(currentUserId))
+          .map(msg => msg._id);
+
+        if (unreadMessages.length > 0) {
+          try {
+            await axios.post(
+              'http://localhost:5000/api/messages/markAsRead',
+              {
+                messageIds: unreadMessages,
+                channelId: selectedChannel._id
+              },
+              getAxiosConfig()
+            );
+
+            // Mettre à jour l'état local
+            setMessages(prevMessages => 
+              prevMessages.map(msg => 
+                unreadMessages.includes(msg._id)
+                  ? { ...msg, readBy: [...(msg.readBy || []), currentUserId] }
+                  : msg
+              )
+            );
+          } catch (error) {
+            console.error('Erreur lors du marquage des messages comme lus:', error);
           }
-          return response.data;
-        });
+        }
       } catch (error) {
         console.error('Erreur lors de la mise à jour des messages:', error);
       }
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [selectedChannel, selectedTeacher, currentUserId]);
+  }, [selectedChannel, currentUserId]);
 
   // Envoyer un message
   const handleSendMessage = async (e) => {
@@ -199,30 +250,6 @@ const MessagesSection = () => {
       }
     }
   }, [messages, firstUnreadMessageId, scrollToBottom, scrollToUnread]);
-
-  const markMessagesAsRead = async () => {
-    if (!selectedChannel || !messages.length) return;
-
-    try {
-      const unreadMessages = messages
-        .filter(msg => !msg.readBy?.includes(currentUserId) && msg.senderId._id !== currentUserId)
-        .map(msg => msg._id);
-
-      if (unreadMessages.length === 0) return;
-
-      await axios.post(
-        'http://localhost:5000/api/messages/markAsRead',
-        {
-          channelId: selectedChannel._id,
-          messageIds: unreadMessages
-        },
-        getAxiosConfig()
-      );
-      setShowUnreadMarker(false);
-    } catch (error) {
-      console.error('Erreur lors du marquage des messages comme lus:', error);
-    }
-  };
 
   const formatTime = (date) => {
     return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
