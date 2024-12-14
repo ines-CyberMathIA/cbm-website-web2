@@ -33,6 +33,7 @@ const createAdminUser = async () => {
       firstName: 'Admin',
       lastName: 'CyberMathIA',
       email: 'admin@cybermathia.com',
+      notificationEmail: 'admin@cybermathia.com',
       password: hashedPassword,
       role: 'admin'
     });
