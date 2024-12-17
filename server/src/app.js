@@ -1,4 +1,5 @@
 import express from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
@@ -9,25 +10,35 @@ import managerRoutes from './routes/managerRoutes.js';
 import teacherRoutes from './routes/teacherRoutes.js';
 import childrenRoutes from './routes/childrenRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
+import initializeMessageSocket from './socket/messageHandler.js';
+import corsConfig from './config/corsConfig.js';
 
 dotenv.config();
 
 const app = express();
+const httpServer = createServer(app);
+const io = initializeMessageSocket(httpServer);
 
 // Middleware pour parser le JSON
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Configuration CORS simplifiée
+// Configuration CORS détaillée
 const corsOptions = {
-  origin: 'http://localhost:3000',  // Uniquement HTTP
+  origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
-// Appliquer CORS avec les options
+// Appliquer CORS globalement
 app.use(cors(corsOptions));
+
+// Activer pre-flight pour toutes les routes
+app.options('*', cors(corsOptions));
 
 // Routes
 app.use('/api/users', userRoutes);
@@ -38,8 +49,8 @@ app.use('/api/children', childrenRoutes);
 app.use('/api/messages', messageRoutes);
 
 // Route de test CORS
-app.options('*', cors(corsOptions));
-app.get('/api/test-cors', cors(corsOptions), (req, res) => {
+app.options('*', cors(corsConfig));
+app.get('/api/test-cors', cors(corsConfig), (req, res) => {
   res.json({ message: 'CORS test successful' });
 });
 
@@ -61,19 +72,9 @@ const startServer = async () => {
     await connectDB();
     const PORT = process.env.PORT || 5000;
     
-    const server = app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       console.log(`Serveur démarré sur le port ${PORT}`);
-      console.log('Environnement:', process.env.NODE_ENV);
-      console.log('CORS Origin:', corsOptions.origin);
-    });
-
-    // Gestion des erreurs du serveur
-    server.on('error', (error) => {
-      console.error('Erreur du serveur:', error);
-      if (error.code === 'EADDRINUSE') {
-        console.error(`Le port ${PORT} est déjà utilisé`);
-        process.exit(1);
-      }
+      console.log('Socket.IO initialisé');
     });
 
   } catch (error) {
@@ -82,6 +83,22 @@ const startServer = async () => {
   }
 };
 
+// Gestionnaire d'erreurs global
+app.use((err, req, res, next) => {
+  console.error('Erreur globale:', err);
+  res.status(err.status || 500).json({
+    message: err.message || 'Erreur interne du serveur',
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
+
+// Gestionnaire pour les routes non trouvées
+app.use((req, res) => {
+  res.status(404).json({
+    message: 'Route non trouvée'
+  });
+});
+
 startServer();
 
-export default app; 
+export { app, io }; 

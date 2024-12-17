@@ -68,7 +68,7 @@ router.get('/my-teachers', authMiddleware, async (req, res) => {
       role: 'teacher',
       managerId: managerId
     }).select('-password');
-    
+
     console.log('Professeurs actifs trouvés:', { count: activeTeachers.length });
 
     // Récupérer les invitations en attente
@@ -83,7 +83,7 @@ router.get('/my-teachers', authMiddleware, async (req, res) => {
       ...activeTeachers.map(t => ({ 
         ...t.toObject(), 
         status: 'active',
-        speciality: t.speciality // On garde speciality cohérent
+        speciality: t.speciality || null
       })),
       ...pendingTeachers.map(t => ({ 
         ...t.toObject(), 
@@ -99,11 +99,10 @@ router.get('/my-teachers', authMiddleware, async (req, res) => {
 
     res.json(allTeachers);
   } catch (error) {
-    console.error('Erreur lors de la récupération des professeurs:', error);
-    console.error('Stack trace:', error.stack);
-    res.status(500).json({ 
-      message: 'Erreur serveur lors de la récupération des professeurs',
-      error: error.message 
+    console.error('Erreur dans /my-teachers:', error);
+    res.status(500).json({
+      message: 'Erreur lors de la récupération des professeurs',
+      error: error.message
     });
   }
 });
@@ -335,7 +334,7 @@ router.delete('/cancel-invitation/:teacherId', authMiddleware, async (req, res) 
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h1 style="color: #4F46E5;">Information importante</h1>
             <p>Bonjour ${pendingTeacher.firstName},</p>
-            <p>Nous vous informons que votre invitation à rejoindre CyberMathIA a été annulée.</p>
+            <p>Nous vous informons que votre invitation �� rejoindre CyberMathIA a été annulée.</p>
             <p>Le lien d'activation précédent n'est plus valide.</p>
             <p style="color: #666;">Si vous pensez qu'il s'agit d'une erreur, veuillez contacter votre manager.</p>
           </div>

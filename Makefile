@@ -11,21 +11,16 @@ all: install start
 install:
 	@echo "Installation des dépendances du serveur..."
 	cd $(SERVER_DIR) && npm install
+	@echo "Installation de socket.io..."
+	cd $(SERVER_DIR) && npm install socket.io@latest --save
 	@echo "Installation des dépendances du client..."
 	cd $(CLIENT_DIR) && npm install
-	@echo "Installation de @headlessui/react..."
-	cd $(CLIENT_DIR) && npm install @headlessui/react --save
-	@echo "Installation de framer-motion..."
-	cd $(CLIENT_DIR) && npm install framer-motion --save
-	@echo "Installation de react-icons..."
-	cd $(CLIENT_DIR) && npm install react-icons --save
 
 # Démarrage des services
 .PHONY: start
-start:
+start: stop
 	@echo "Démarrage du serveur en arrière-plan..."
 	cd $(SERVER_DIR) && npm run dev & 
-	@sleep 5
 	@echo "Démarrage du client..."
 	cd $(CLIENT_DIR) && npm start
 
@@ -40,7 +35,7 @@ stop:
 .PHONY: restart
 restart: stop start
 
-# Redémarrage complet
+# Redémarrage complet avec réinstallation
 .PHONY: restart-all
 restart-all: clean install restart
 
@@ -50,6 +45,8 @@ clean:
 	@echo "Nettoyage des node_modules..."
 	rm -rf $(SERVER_DIR)/node_modules
 	rm -rf $(CLIENT_DIR)/node_modules
+	rm -rf $(SERVER_DIR)/package-lock.json
+	rm -rf $(CLIENT_DIR)/package-lock.json
 
 # Aide
 .PHONY: help

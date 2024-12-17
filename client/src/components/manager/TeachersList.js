@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import config from '../../config';
 
 // Fonction pour formater le temps restant
 const formatTimeLeft = (expiresAt) => {
@@ -58,47 +59,40 @@ const TeachersList = ({ onTeacherClick, isDarkMode, onInviteClick }) => {
   const [lastUpdate, setLastUpdate] = useState(Date.now());
 
   // Utiliser useRef pour stocker l'intervalle
-  const intervalRef = React.useRef(null);
+  const intervalRef = useRef(null);
 
   const fetchTeachers = async () => {
     try {
+      setLoading(true);
       const token = sessionStorage.getItem('token');
-      if (!token) {
-        throw new Error('Token manquant');
-      }
-
-      const response = await axios.get('http://localhost:5000/api/manager/my-teachers', {
-        headers: {
-          Authorization: `Bearer ${token}`
+      const response = await axios.get(
+        `${config.API_URL}/api/manager/my-teachers`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          withCredentials: true
         }
-      });
-
-      if (!response.data) {
-        throw new Error('Données invalides reçues du serveur');
+      );
+      
+      if (response.data) {
+        setTeachers(response.data);
+        setError(null);
       }
-
-      setTeachers(response.data);
-      setError(null);
-      setLoading(false);
-      setLastUpdate(Date.now());
     } catch (error) {
       console.error('Erreur lors de la récupération des professeurs:', error);
-      
-      if (error.response?.status === 401) {
-        setError('Session expirée. Veuillez vous reconnecter.');
-        setLoading(false);
-        return;
-      }
-
-      setError('Impossible de charger la liste des professeurs');
+      setError(error.message || 'Erreur lors de la récupération des professeurs');
+    } finally {
       setLoading(false);
+      setLastUpdate(Date.now());
     }
   };
 
   useEffect(() => {
     fetchTeachers();
 
-    // Mettre à jour toutes les 30 secondes au lieu de continuellement
+    // Mettre à jour toutes les 30 secondes
     intervalRef.current = setInterval(() => {
       fetchTeachers();
     }, 30000);
@@ -109,6 +103,28 @@ const TeachersList = ({ onTeacherClick, isDarkMode, onInviteClick }) => {
       }
     };
   }, []);
+
+  if (loading && teachers.length === 0) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center p-4 text-red-600">
+        <p>{error}</p>
+        <button 
+          onClick={fetchTeachers}
+          className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+        >
+          Réessayer
+        </button>
+      </div>
+    );
+  }
 
   // Ajouter un gestionnaire d'événements pour le rafraîchissement manuel
   const handleRefresh = () => {

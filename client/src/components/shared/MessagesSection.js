@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { FiSend, FiSearch, FiCheck, FiClock, FiMessageCircle, FiMenu } from 'react-icons/fi';
+import { useSocket } from '../../hooks/useSocket';
 
 const MessagesSection = () => {
   const [contacts, setContacts] = useState([]);
@@ -16,6 +17,7 @@ const MessagesSection = () => {
   const messagesEndRef = useRef(null);
   const { darkMode } = useTheme();
   const { user } = useAuth();
+  const { socket, isConnected, lastMessage } = useSocket();
 
   const isManager = user?.role === 'manager';
 
@@ -113,29 +115,33 @@ const MessagesSection = () => {
     }
   };
 
-  // Charger les messages quand un canal est sélectionné
+  // Écouter les messages en temps réel
   useEffect(() => {
-    const fetchMessages = async () => {
-      if (!selectedChannel) return;
-      
-      try {
-        const response = await axios.get(
-          `http://localhost:5000/api/messages/channel/${selectedChannel._id}`,
-          getAxiosConfig()
-        );
-        setMessages(response.data);
-        scrollToBottom();
-      } catch (error) {
-        console.error('Erreur lors du chargement des messages:', error);
-      }
-    };
-
-    if (selectedChannel) {
-      fetchMessages();
-      const interval = setInterval(fetchMessages, 5000);
-      return () => clearInterval(interval);
+    if (lastMessage && selectedChannel?._id === lastMessage.channelId) {
+      setMessages(prev => [...prev, lastMessage]);
+      scrollToBottom();
     }
-  }, [selectedChannel]);
+  }, [lastMessage, selectedChannel]);
+
+  // Charger l'historique des messages lors de la sélection d'un canal
+  useEffect(() => {
+    if (!selectedChannel || !socket) return;
+
+    // Informer le serveur du canal actif
+    socket.emit('join_channel', { channelId: selectedChannel._id });
+
+    // Charger l'historique initial
+    socket.emit('get_channel_history', { channelId: selectedChannel._id }, (response) => {
+      if (response.success) {
+        setMessages(response.messages);
+        scrollToBottom();
+      }
+    });
+
+    return () => {
+      socket.emit('leave_channel', { channelId: selectedChannel._id });
+    };
+  }, [selectedChannel, socket]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -185,6 +191,47 @@ const MessagesSection = () => {
     }
     return contact.name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
+
+  // Envoyer un message
+  const sendMessage = (content) => {
+    if (!socket || !selectedChannel || !content.trim()) return;
+
+    socket.emit('send_message', {
+      channelId: selectedChannel._id,
+      content: content.trim(),
+      receiverId: selectedChannel.teacher?._id || selectedChannel.manager?._id
+    });
+  };
+
+  // Gérer la sélection d'un canal
+  const handleChannelSelect = (channel) => {
+    setSelectedChannel(channel);
+    if (socket) {
+      socket.emit('mark_channel_as_read', { channelId: channel._id });
+    }
+  };
+
+  // Marquer les messages comme lus
+  const markMessagesAsRead = (messageIds) => {
+    if (!socket || !selectedChannel) return;
+
+    socket.emit('mark_as_read', {
+      channelId: selectedChannel._id,
+      messageIds
+    });
+  };
+
+  // Indicateur de connexion
+  if (!isConnected) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mb-4"></div>
+          <p>Connexion en cours...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex h-full ${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-800'}`}>
