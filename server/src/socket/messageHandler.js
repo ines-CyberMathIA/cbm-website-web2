@@ -5,161 +5,108 @@ import jwt from 'jsonwebtoken';
 import corsConfig from '../config/corsConfig.js';
 import User from '../models/User.js';
 
+let connectedUsers = new Map(); // userId -> socket
+
 export default function initializeMessageSocket(server) {
   const io = new Server(server, {
-    cors: {
-      origin: corsConfig.origin,
-      methods: corsConfig.methods,
-      credentials: corsConfig.credentials,
-      allowedHeaders: corsConfig.allowedHeaders
-    }
+    cors: corsConfig
   });
 
-  // Middleware d'authentification des sockets avec plus de logs
   io.use(async (socket, next) => {
     try {
-      console.log('Socket auth attempt');
-      const token = socket.handshake.auth.token || 
-                   socket.handshake.headers.authorization?.split(' ')[1];
-      
-      if (!token) {
-        console.log('No token provided');
-        return next(new Error('Authentication error: No token provided'));
-      }
-      
+      const token = socket.handshake.auth.token;
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       socket.user = decoded;
-      console.log('Socket authenticated for user:', decoded.userId);
       next();
     } catch (error) {
-      console.error('Socket auth error:', error);
-      next(new Error(`Authentication error: ${error.message}`));
+      next(new Error('Authentication error'));
     }
   });
 
-  // Gestion des connexions
-  io.on('connection', (socket) => {
+  io.on('connection', async (socket) => {
     const userId = socket.user.userId;
-    console.log(`User connected: ${userId}`);
-
-    // Mettre à jour le statut en ligne
-    User.findByIdAndUpdate(userId, { isOnline: true })
-      .then(() => {
-        // Informer les autres utilisateurs
-        socket.broadcast.emit('user_status', {
-          userId,
-          status: 'online'
-        });
+    
+    // Gérer la connexion d'un utilisateur
+    socket.on('user_connected', async (data) => {
+      connectedUsers.set(userId, socket.id);
+      
+      // Mettre à jour le statut dans la base de données
+      await User.findByIdAndUpdate(userId, { 
+        isOnline: true,
+        lastSeen: new Date()
       });
 
-    // Rejoindre son canal personnel
-    socket.join(`user_${userId}`);
-
-    // Rejoindre le canal personnel
-    socket.on('join_personal_channel', ({ userId }) => {
-      socket.join(`user_${userId}`);
-      console.log(`User ${userId} joined personal channel`);
-    });
-
-    // Rejoindre un canal de discussion
-    socket.on('join_channel', ({ channelId }) => {
-      socket.join(`channel_${channelId}`);
-      console.log(`User ${userId} joined channel ${channelId}`);
-    });
-
-    // Quitter un canal
-    socket.on('leave_channel', ({ channelId }) => {
-      socket.leave(`channel_${channelId}`);
-    });
-
-    // Récupérer l'historique d'un canal
-    socket.on('get_channel_history', async ({ channelId }, callback) => {
-      try {
-        const messages = await Message.find({ channelId })
-          .sort({ createdAt: 1 })
-          .populate('senderId', 'firstName lastName')
-          .limit(100);
-        
-        callback({ success: true, messages });
-      } catch (error) {
-        callback({ success: false, error: error.message });
-      }
-    });
-
-    // Écouter les nouveaux messages
-    socket.on('send_message', async (data) => {
-      try {
-        const { channelId, content, receiverId } = data;
-        
-        // Créer le message
-        const message = await Message.create({
-          channelId,
-          senderId: userId,
-          receiverId,
-          content
-        });
-
-        // Mettre à jour le canal
-        await MessageChannel.updateOne(
-          { _id: channelId },
-          { 
-            lastMessage: new Date(),
-            $inc: { [`unreadCount.${receiverId === userId ? 'manager' : 'teacher'}`]: 1 }
-          }
-        );
-
-        // Émettre aux destinataires
-        io.to(`user_${receiverId}`).emit('new_message', {
-          message,
-          channelId
-        });
-
-        // Confirmation à l'émetteur
-        socket.emit('message_sent', { message });
-
-      } catch (error) {
-        socket.emit('message_error', { error: error.message });
-      }
-    });
-
-    // Marquer les messages comme lus
-    socket.on('mark_as_read', async ({ channelId, messageIds }) => {
-      try {
-        await Message.updateMany(
-          { _id: { $in: messageIds } },
-          { $addToSet: { readBy: userId } }
-        );
-
-        // Réinitialiser le compteur de messages non lus
-        const userRole = socket.user.role;
-        const updateField = `unreadCount.${userRole === 'manager' ? 'manager' : 'teacher'}`;
-        
-        await MessageChannel.updateOne(
-          { _id: channelId },
-          { $set: { [updateField]: 0 } }
-        );
-
-        socket.emit('messages_marked_read', { channelId, messageIds });
-      } catch (error) {
-        socket.emit('mark_read_error', { error: error.message });
-      }
+      // Émettre la liste mise à jour des utilisateurs en ligne
+      io.emit('users_status', Array.from(connectedUsers.keys()));
     });
 
     // Gérer la déconnexion
     socket.on('disconnect', async () => {
-      await User.findByIdAndUpdate(userId, { 
+      connectedUsers.delete(userId);
+      
+      // Mettre à jour le statut dans la base de données
+      await User.findByIdAndUpdate(userId, {
         isOnline: false,
         lastSeen: new Date()
       });
 
-      // Informer les autres utilisateurs
-      socket.broadcast.emit('user_status', {
-        userId,
-        status: 'offline',
-        lastSeen: new Date()
-      });
+      // Émettre la liste mise à jour
+      io.emit('users_status', Array.from(connectedUsers.keys()));
     });
+
+    // ... reste du code pour la gestion des messages
   });
 
   return io;
 } 
+
+const handleNewMessage = async (io, socket, data) => {
+  try {
+    const { message, channelId } = data;
+    
+    // Émettre à tous les clients dans le canal
+    io.to(channelId).emit('new_message', {
+      channelId,
+      message: {
+        ...message,
+        createdAt: new Date(),
+        readBy: [message.senderId]
+      }
+    });
+
+    // Notifier les utilisateurs hors ligne
+    const offlineUsers = await getOfflineUsersInChannel(channelId);
+    for (const userId of offlineUsers) {
+      await createNotification({
+        userId,
+        type: 'new_message',
+        channelId,
+        messageId: message._id
+      });
+    }
+
+  } catch (error) {
+    console.error('Erreur socket message:', error);
+    socket.emit('message_error', { error: error.message });
+  }
+};
+
+const handleMessageRead = async (io, socket, data) => {
+  try {
+    const { messageId, channelId, userId } = data;
+    
+    // Émettre la mise à jour à tous les clients dans le canal
+    io.to(channelId).emit('message_updated', {
+      channelId,
+      messageId,
+      updates: {
+        readBy: userId
+      }
+    });
+
+  } catch (error) {
+    console.error('Erreur marquage message:', error);
+  }
+};
+
+export { handleNewMessage, handleMessageRead }; 

@@ -1,51 +1,33 @@
 import React from 'react';
 import { FiCheck } from 'react-icons/fi';
 
-const MessageComponent = ({ message, isCurrentUser, formatTime, isDarkMode }) => {
+const MessageComponent = ({ message, isOwnMessage, isDarkMode }) => {
   return (
     <div
-      className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} mb-4`}
+      id={`message-${message._id}`}
+      className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
     >
       <div
         className={`flex flex-col ${
-          isCurrentUser ? 'items-end' : 'items-start'
+          isOwnMessage ? 'items-end' : 'items-start'
         } max-w-[80%]`}
       >
         <div
-          className={`rounded-lg px-4 py-2 min-w-[120px] max-w-[80%] break-words ${
-            !isCurrentUser
-              ? `${isDarkMode ? 'bg-indigo-500/90' : 'bg-indigo-100'} ${isDarkMode ? 'text-white' : 'text-indigo-900'}`
-              : `${
-                  isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
-                } ${isDarkMode ? 'text-white' : 'text-gray-600'}`
+          className={`rounded-lg px-4 py-2 ${
+            isOwnMessage
+              ? 'bg-indigo-500 text-white'
+              : 'bg-gray-100 text-gray-900'
           }`}
         >
-          <div className="mb-2">{message.content}</div>
-          <div className={`text-xs ${!isCurrentUser ? (isDarkMode ? 'text-white/80' : 'text-indigo-700') : (isDarkMode ? 'text-gray-400' : 'text-gray-400')} text-right flex items-center justify-end gap-1`}>
-            <span>{formatTime(message.createdAt)}</span>
-            {isCurrentUser && (
-              <div className="flex items-center ml-1">
-                {!message.readBy?.length ? (
-                  // Message envoyé mais pas encore reçu
-                  <FiCheck className="inline-block w-3 h-3" />
-                ) : message.readBy?.length === 1 ? (
-                  // Message reçu
-                  <div className="flex">
-                    <FiCheck className="inline-block w-3 h-3" />
-                    <FiCheck className="inline-block w-3 h-3 -ml-1" />
-                  </div>
-                ) : (
-                  // Message lu
-                  <div className="flex">
-                    <FiCheck className="inline-block w-3 h-3" />
-                    <FiCheck className={`inline-block w-3 h-3 -ml-1 ${
-                      isDarkMode ? 'text-blue-400' : 'text-blue-500'
-                    }`} />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          {message.content}
+        </div>
+        
+        <div className="text-xs mt-1 text-gray-500">
+          {message.status === 'sending' && '⏳ Envoi...'}
+          {message.status === 'sent' && '✓ Envoyé'}
+          {message.status === 'received' && '✓✓ Reçu'}
+          {message.status === 'read' && '✓✓ Lu'}
+          {message.status === 'failed' && '❌ Échec'}
         </div>
       </div>
     </div>

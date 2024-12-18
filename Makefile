@@ -15,6 +15,8 @@ install:
 	cd $(SERVER_DIR) && npm install socket.io@latest --save
 	@echo "Installation des dépendances du client..."
 	cd $(CLIENT_DIR) && npm install
+	@echo "Installation des dépendances pour les notifications..."
+	cd $(CLIENT_DIR) && npm install react-toastify react-icons socket.io-client --save
 
 # Démarrage des services
 .PHONY: start

@@ -6,6 +6,8 @@ import TeachersList from './manager/TeachersList';
 import MessagesSection from './manager/MessagesSection';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useSocket } from '../hooks/useSocket';
+import { useNotification } from '../contexts/NotificationContext';
 
 // Ajouter le composant TeacherModal
 const TeacherModal = ({ onClose, setError }) => {
@@ -330,12 +332,142 @@ const ManagerDashboard = () => {
   const user = JSON.parse(sessionStorage.getItem('user'));
   const { darkMode, toggleTheme } = useTheme();
   const { user: authUser } = useAuth();
+  const { socket, isConnected } = useSocket();
+  const { addNotification } = useNotification();
 
   const [activeSection, setActiveSection] = useState('teachers');
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [error, setError] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [teachers, setTeachers] = useState([]);
+
+  // Charger toutes les données au démarrage
+  useEffect(() => {
+    const loadAllData = async () => {
+      console.log('📥 Chargement initial des données...');
+      
+      try {
+        // Charger les professeurs
+        const teachersResponse = await axios.get('http://localhost:5000/api/manager/my-teachers', {
+          headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
+        });
+        setTeachers(teachersResponse.data);
+        console.log('👥 Professeurs chargés:', teachersResponse.data);
+
+        // Notification de succès pour les professeurs
+        addNotification({
+          title: 'Données chargées',
+          message: 'Les données principales ont été synchronisées',
+          type: 'success'
+        });
+      } catch (error) {
+        console.error('❌ Erreur lors du chargement des professeurs:', error);
+        addNotification({
+          title: 'Erreur',
+          message: 'Impossible de charger la liste des professeurs',
+          type: 'error'
+        });
+      }
+    };
+
+    if (isConnected) {
+      loadAllData();
+    }
+  }, [isConnected, addNotification]);
+
+  // Gestion des événements socket
+  React.useEffect(() => {
+    if (!socket || !isConnected || !teachers.length) {
+      console.log('⚠️ État initial:', { socket, isConnected, teachersCount: teachers.length });
+      return;
+    }
+
+    console.log('👂 Configuration des écouteurs');
+
+    // Rejoindre les canaux
+    teachers.forEach(teacher => {
+      const teacherId = teacher._id;
+      const channelId = teacher.channelId || '675de5ce4d954b25b7b2f283';
+      console.log('🔗 Rejoindre les canaux:', {
+        teacherId,
+        channelId,
+        teacherName: teacher.firstName
+      });
+      socket.emit('join_channel', { channelId: teacherId });
+      socket.emit('join_channel', { channelId });
+    });
+
+    // Handler pour les messages
+    const handleNewMessage = (data) => {
+      console.log('📩 Message reçu:', data);
+      
+      if (!data?.message) {
+        console.error('❌ Format invalide:', data);
+        return;
+      }
+
+      const { message, channelId } = data;
+      
+      // Logs détaillés
+      console.log('📝 Détails du message:', {
+        content: message.content,
+        senderId: message.senderId,
+        channelId,
+        currentUser: user?.userId
+      });
+
+      // Ne pas notifier si c'est notre propre message
+      if (message.senderId !== user?.userId) {
+        const teacher = teachers.find(t => t._id === message.senderId);
+        const senderName = teacher ? `${teacher.firstName} ${teacher.lastName}` : 'Un professeur';
+        
+        const notificationData = {
+          title: `💬 Message de ${senderName}`,
+          message: message.content.length > 50 
+            ? `${message.content.substring(0, 50)}...` 
+            : message.content,
+          type: 'info'
+        };
+
+        console.log('📬 Envoi de la notification:', notificationData);
+        addNotification(notificationData);
+      } else {
+        console.log('❌ Message envoyé par nous-mêmes, pas de notification');
+      }
+    };
+
+    // Handler pour les changements de statut
+    const handleUserStatus = ({ userId, status }) => {
+      console.log('👤 Changement de statut utilisateur:', { userId, status });
+      
+      const teacher = teachers.find(t => t._id === userId);
+      if (teacher) {
+        const isOnline = status === 'online';
+        console.log(`${isOnline ? '🟢' : '🔴'} Statut de ${teacher.firstName}:`, status);
+        
+        addNotification({
+          title: `${isOnline ? '🟢' : '🔴'} Statut professeur`,
+          message: `${teacher.firstName} ${teacher.lastName} est maintenant ${isOnline ? 'en ligne' : 'hors ligne'}`,
+          type: isOnline ? 'success' : 'info'
+        });
+      }
+    };
+
+    // Attacher les écouteurs
+    socket.on('new_message', handleNewMessage);
+    socket.on('user_status', handleUserStatus);
+
+    // Vérifier que les écouteurs sont bien attachés
+    const listeners = socket.listeners('new_message');
+    console.log('🎧 Nombre d\'écouteurs new_message:', listeners.length);
+    
+    return () => {
+      console.log('🧹 Nettoyage des écouteurs');
+      socket.off('new_message', handleNewMessage);
+      socket.off('user_status', handleUserStatus);
+    };
+  }, [socket, isConnected, teachers, user, addNotification]);
 
   // Vérification de l'authentification
   React.useEffect(() => {
@@ -365,6 +497,11 @@ const ManagerDashboard = () => {
     setSelectedTeacher(teacher);
     setActiveSection('teacherDetails');
   };
+
+  // Log de l'état de la connexion
+  React.useEffect(() => {
+    console.log('🔌 État de la connexion socket (ManagerDashboard):', isConnected);
+  }, [isConnected]);
 
   return (
     <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-200`}>

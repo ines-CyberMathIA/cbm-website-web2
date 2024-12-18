@@ -8,6 +8,8 @@ import { FiSend, FiSearch, FiMessageCircle, FiMenu } from 'react-icons/fi';
 import MessageComponent from '../shared/MessageComponent';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useSocket } from '../../hooks/useSocket';
+import { useNotification } from '../../contexts/NotificationContext';
 
 const Messages = ({ isDarkMode }) => {
   const [newMessage, setNewMessage] = useState('');
@@ -24,6 +26,8 @@ const Messages = ({ isDarkMode }) => {
   const messagesEndRef = useRef(null);
   const unreadMarkerRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  const { socket, isConnected } = useSocket();
+  const { addNotification } = useNotification();
 
   console.log('User object:', user);
 
@@ -342,25 +346,56 @@ const Messages = ({ isDarkMode }) => {
   }, []);
 
   // Envoyer un nouveau message
-  const sendMessage = async (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !activeChannel?._id) return;
 
-    try {
-      const response = await axios.post(
-        `${config.API_URL}/api/messages/send`,
-        {
-          content: newMessage,
-          channelId: activeChannel._id
-        },
-        getAxiosConfig()
-      );
+    console.log('🎯 Tentative d\'envoi de message:', {
+      content: newMessage,
+      channelId: activeChannel._id
+    });
 
-      setMessages(prevMessages => [...prevMessages, response.data]);
-      setNewMessage('');
-      scrollToBottom(); // Défiler en bas après l'envoi d'un message
+    try {
+      // 1. Envoi API
+      const response = await axios.post(`${config.API_URL}/api/messages/send`, {
+        content: newMessage,
+        channelId: activeChannel._id
+      }, {
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
+      });
+
+      const newMessageData = response.data;
+      console.log('✅ Message sauvegardé en DB:', newMessageData);
+
+      // 2. Émission socket
+      if (socket && isConnected) {
+        const socketData = {
+          message: newMessageData,
+          channelId: activeChannel._id,
+          sender: {
+            firstName: user.firstName,
+            lastName: user.lastName,
+            _id: user.userId
+          }
+        };
+        console.log('📤 Données socket à émettre:', socketData);
+        socket.emit('send_message', socketData);
+      } else {
+        console.warn('⚠️ Socket non disponible pour l\'émission du message');
+      }
+
+      // 3. Mise à jour de l'interface
+      setMessages(prev => [...prev, newMessageData]);
+      setNewMessage(''); // Vider le champ de saisie
+      scrollToBottom(); // Défiler vers le bas
+
     } catch (error) {
-      console.error('Erreur lors de l\'envoi du message:', error);
+      console.error('❌ Erreur lors de l\'envoi:', error);
+      addNotification({
+        title: 'Erreur',
+        message: 'Impossible d\'envoyer le message',
+        type: 'error'
+      });
     }
   };
 
@@ -380,6 +415,15 @@ const Messages = ({ isDarkMode }) => {
     }
     return format(new Date(date), 'EEEE d MMMM', { locale: fr });
   };
+
+  // Log de l'état de la connexion
+  useEffect(() => {
+    console.log('🔌 État de la connexion socket (Messages):', {
+      isConnected,
+      socketId: socket?.id,
+      channelId: activeChannel?._id
+    });
+  }, [isConnected, socket, activeChannel]);
 
   return (
     <div className="w-full h-[calc(100vh-5rem)] p-4">
@@ -615,7 +659,7 @@ const Messages = ({ isDarkMode }) => {
 
                 {/* Zone de saisie */}
                 <div className={`flex-shrink-0 p-4 ${isDarkMode ? 'bg-gray-900/70' : 'bg-white/90'} border-t backdrop-blur-sm ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                  <form onSubmit={sendMessage} className="flex space-x-4">
+                  <form onSubmit={handleSendMessage} className="flex space-x-4">
                     <input
                       type="text"
                       value={newMessage}

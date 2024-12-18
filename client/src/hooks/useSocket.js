@@ -1,59 +1,71 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import config from '../config';
+import { useAuth } from '../contexts/AuthContext';
 
 export const useSocket = () => {
-  const socket = useRef(null);
+  const socketRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState(null);
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
+  const { user } = useAuth();
 
-  useEffect(() => {
-    const token = sessionStorage.getItem('token');
-    
-    // Initialiser la connexion socket
-    socket.current = io(config.API_URL, {
-      auth: { token },
-      withCredentials: true,
-      autoConnect: true,
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5
+  const initializeSocket = useCallback(() => {
+    if (!user) return;
+
+    socketRef.current = io(config.API_URL, {
+      auth: {
+        token: sessionStorage.getItem('token')
+      }
     });
 
-    // Gestionnaire de connexion
-    socket.current.on('connect', () => {
-      console.log('Socket connecté');
+    // Gestion de la connexion
+    socketRef.current.on('connect', () => {
+      console.log('🟢 Socket connecté');
       setIsConnected(true);
       
-      // Rejoindre le canal personnel
-      const userId = JSON.parse(atob(token.split('.')[1])).userId;
-      socket.current.emit('join_personal_channel', { userId });
+      // Émettre le statut en ligne
+      socketRef.current.emit('user_connected', {
+        userId: user.userId,
+        role: user.role
+      });
     });
 
-    // Gestionnaire de déconnexion
-    socket.current.on('disconnect', () => {
-      console.log('Socket déconnecté');
-      setIsConnected(false);
+    // Écouter les changements de statut des utilisateurs
+    socketRef.current.on('users_status', (users) => {
+      setOnlineUsers(new Set(users.map(u => u.userId)));
     });
 
-    // Gestionnaire de messages
-    socket.current.on('new_message', (message) => {
-      setLastMessage(message);
-    });
-
-    // Gestionnaire d'erreurs
-    socket.current.on('connect_error', (error) => {
-      console.error('Erreur de connexion socket:', error);
+    // Gestion de la déconnexion
+    socketRef.current.on('disconnect', () => {
+      console.log('🔴 Socket déconnecté');
       setIsConnected(false);
     });
 
     return () => {
-      if (socket.current) {
-        socket.current.disconnect();
+      if (socketRef.current) {
+        socketRef.current.disconnect();
       }
     };
-  }, []);
+  }, [user]);
 
-  return { socket: socket.current, isConnected, lastMessage };
+  // Initialiser le socket au montage
+  useEffect(() => {
+    const cleanup = initializeSocket();
+    return () => {
+      cleanup?.();
+      socketRef.current = null;
+    };
+  }, [initializeSocket]);
+
+  // Fonction pour vérifier si un utilisateur est en ligne
+  const isUserOnline = useCallback((userId) => {
+    return onlineUsers.has(userId);
+  }, [onlineUsers]);
+
+  return {
+    socket: socketRef.current,
+    isConnected,
+    isUserOnline,
+    onlineUsers: Array.from(onlineUsers)
+  };
 }; 

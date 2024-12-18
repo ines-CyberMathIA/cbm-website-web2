@@ -6,6 +6,9 @@ import StudentsList from './teacher/StudentsList';
 import CourseLibrary from './teacher/CourseLibrary';
 import SessionReports from './teacher/SessionReports';
 import Messages from './teacher/Messages';
+import { useSocket } from '../hooks/useSocket';
+import { useNotification } from '../contexts/NotificationContext';
+import { useTeacherSocket } from '../hooks/useTeacherSocket';
 
 const TeacherDashboard = () => {
   const navigate = useNavigate();
@@ -16,6 +19,8 @@ const TeacherDashboard = () => {
     const savedMode = localStorage.getItem('darkMode');
     return savedMode ? JSON.parse(savedMode) : false;
   });
+  const { socket, isConnected } = useTeacherSocket();
+  const { addNotification } = useNotification();
 
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
@@ -23,6 +28,46 @@ const TeacherDashboard = () => {
       navigate('/login');
     }
   }, [isDarkMode, navigate, user]);
+
+  // Log de l'état de la connexion
+  useEffect(() => {
+    console.log('🔌 État de la connexion socket (TeacherDashboard):', isConnected);
+  }, [isConnected]);
+
+  // Écouter les notifications globales
+  useEffect(() => {
+    if (!socket) {
+      console.log('⚠️ Socket non initialisé dans TeacherDashboard');
+      return;
+    }
+
+    console.log('👂 Configuration des écouteurs globaux (TeacherDashboard)');
+
+    // Écouter les nouveaux messages même hors de MessagesSection
+    socket.on('new_message', ({ message }) => {
+      console.log('📨 Message reçu dans TeacherDashboard:', message);
+      addNotification({
+        title: `Nouveau message de ${message.sender?.firstName || 'Quelqu\'un'}`,
+        message: message.content.substring(0, 50) + (message.content.length > 50 ? '...' : ''),
+        type: 'info'
+      });
+    });
+
+    return () => {
+      console.log('🧹 Nettoyage des écouteurs (TeacherDashboard)');
+      socket.off('new_message');
+    };
+  }, [socket, addNotification]);
+
+  // Test de notification au montage
+  useEffect(() => {
+    console.log('🔌 Test de notification...');
+    addNotification({
+      title: 'Bienvenue',
+      message: 'Vous êtes connecté au tableau de bord professeur',
+      type: 'success'
+    });
+  }, []); // Uniquement au montage
 
   const menuItems = [
     { 
@@ -67,6 +112,11 @@ const TeacherDashboard = () => {
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+      {/* Indicateur de connexion */}
+      <div className={`fixed top-4 right-4 w-3 h-3 rounded-full ${
+        isConnected ? 'bg-green-500' : 'bg-red-500'
+      }`} />
+
       {/* Header avec bouton menu */}
       <header className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

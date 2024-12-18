@@ -4,6 +4,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { FiSend, FiSearch, FiCheck, FiClock, FiMessageCircle, FiMenu } from 'react-icons/fi';
 import { useSocket } from '../../hooks/useSocket';
+import { useNotification } from '../../contexts/NotificationContext';
 
 const MessagesSection = () => {
   const [contacts, setContacts] = useState([]);
@@ -18,6 +19,7 @@ const MessagesSection = () => {
   const { darkMode } = useTheme();
   const { user } = useAuth();
   const { socket, isConnected, lastMessage } = useSocket();
+  const { addNotification } = useNotification();
 
   const isManager = user?.role === 'manager';
 
@@ -33,16 +35,21 @@ const MessagesSection = () => {
   useEffect(() => {
     const fetchChannels = async () => {
       try {
+        console.log('📩 Chargement des canaux de discussion...');
         setIsLoading(true);
         const endpoint = isManager 
           ? 'http://localhost:5000/api/manager/message-channels'
           : 'http://localhost:5000/api/messages/channel';
+        
+        console.log('🔍 Requête vers:', endpoint);
         const response = await axios.get(endpoint, getAxiosConfig());
-        setChannels(isManager ? response.data : [response.data]);
+        const loadedChannels = isManager ? response.data : [response.data];
+        console.log('✅ Canaux chargés:', loadedChannels);
+        setChannels(loadedChannels);
       } catch (error) {
-        console.error('Erreur lors du chargement des canaux:', error);
+        console.error('❌ Erreur lors du chargement des canaux:', error);
         if (error.response?.status === 401) {
-          alert('Session expirée. Veuillez vous reconnecter.');
+          console.log('🔒 Session expirée, redirection vers login');
           window.location.href = '/login';
         }
       } finally {
@@ -117,11 +124,37 @@ const MessagesSection = () => {
 
   // Écouter les messages en temps réel
   useEffect(() => {
-    if (lastMessage && selectedChannel?._id === lastMessage.channelId) {
-      setMessages(prev => [...prev, lastMessage]);
-      scrollToBottom();
+    if (!socket) {
+      console.log('⚠️ Socket non initialisé');
+      return;
     }
-  }, [lastMessage, selectedChannel]);
+
+    console.log('👂 Configuration des écouteurs de messages');
+
+    socket.on('new_message', ({ message, channelId }) => {
+      console.log('📨 Nouveau message reçu:', { message, channelId });
+      
+      if (message.senderId !== user.userId) {
+        console.log('🔔 Création notification pour nouveau message');
+        addNotification({
+          title: `Nouveau message de ${message.sender?.firstName || 'Quelqu\'un'}`,
+          message: message.content.substring(0, 50) + (message.content.length > 50 ? '...' : ''),
+          type: 'info'
+        });
+      }
+
+      if (selectedChannel?._id === channelId) {
+        console.log('📝 Mise à jour des messages du canal actif');
+        setMessages(prev => [...prev, message]);
+        scrollToBottom();
+      }
+    });
+
+    return () => {
+      console.log('🧹 Nettoyage des écouteurs de messages');
+      socket.off('new_message');
+    };
+  }, [socket, selectedChannel, user, addNotification]);
 
   // Charger l'historique des messages lors de la sélection d'un canal
   useEffect(() => {
