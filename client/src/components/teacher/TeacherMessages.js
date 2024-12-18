@@ -13,15 +13,24 @@ const TeacherMessages = ({ isDarkMode }) => {
   const [selectedChannel, setSelectedChannel] = useState(null);
   const { user } = useAuth();
   const { addNotification } = useNotification();
-  
-  // Utiliser le hook useMessages pour la gestion temps réel
-  const { messages, loading, sendMessage } = useMessages(selectedChannel?._id);
   const { socket, isConnected } = useSocket();
+  
+  // Ajouter des logs pour le debug
+  useEffect(() => {
+    console.log('État de la connexion socket (TeacherMessages):', {
+      isConnected,
+      socketExists: !!socket,
+      user,
+      channelId: selectedChannel?._id
+    });
+  }, [isConnected, socket, user, selectedChannel]);
 
   // Charger les informations du manager et créer/récupérer le canal
   useEffect(() => {
     const initializeChat = async () => {
       try {
+        console.log('Initialisation du chat professeur...');
+        
         // Récupérer les infos du manager
         const managerResponse = await axios.get(
           `${config.API_URL}/api/teacher/manager-info`,
@@ -29,6 +38,7 @@ const TeacherMessages = ({ isDarkMode }) => {
             headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` }
           }
         );
+        console.log('Infos manager récupérées:', managerResponse.data);
         setManagerInfo(managerResponse.data);
 
         // Créer ou récupérer le canal de discussion
@@ -39,7 +49,15 @@ const TeacherMessages = ({ isDarkMode }) => {
             headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` }
           }
         );
+        console.log('Canal créé/récupéré:', channelResponse.data);
         setSelectedChannel(channelResponse.data);
+
+        // Si le socket est connecté, rejoindre le canal
+        if (socket && isConnected) {
+          console.log('Rejoindre le canal:', channelResponse.data._id);
+          socket.emit('join_channel', { channelId: channelResponse.data._id });
+        }
+
       } catch (error) {
         console.error('Erreur initialisation chat:', error);
         addNotification({
@@ -50,8 +68,30 @@ const TeacherMessages = ({ isDarkMode }) => {
       }
     };
 
-    initializeChat();
-  }, []);
+    if (isConnected) {
+      initializeChat();
+    }
+  }, [isConnected, socket, addNotification]);
+
+  // Écouter les nouveaux messages
+  useEffect(() => {
+    if (!socket || !selectedChannel) {
+      console.log('Socket ou canal non initialisé');
+      return;
+    }
+
+    console.log('Configuration des écouteurs de messages');
+    
+    socket.on('new_message', (data) => {
+      console.log('Nouveau message reçu:', data);
+      // Traitement du message...
+    });
+
+    return () => {
+      console.log('Nettoyage des écouteurs de messages');
+      socket.off('new_message');
+    };
+  }, [socket, selectedChannel]);
 
   // Gérer l'envoi d'un nouveau message
   const handleSendMessage = async (e) => {

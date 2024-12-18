@@ -9,6 +9,7 @@ import Messages from './teacher/Messages';
 import { useSocket } from '../hooks/useSocket';
 import { useNotification } from '../contexts/NotificationContext';
 import { useTeacherSocket } from '../hooks/useTeacherSocket';
+import { useTeacherMessages } from '../hooks/useTeacherMessages';
 
 const TeacherDashboard = () => {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ const TeacherDashboard = () => {
   });
   const { socket, isConnected } = useTeacherSocket();
   const { addNotification } = useNotification();
+  const { messages, loading: messagesLoading, channel, managerInfo } = useTeacherMessages();
 
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
@@ -87,7 +89,16 @@ const TeacherDashboard = () => {
       case 'students': return <StudentsList isDarkMode={isDarkMode} />;
       case 'courses': return <CourseLibrary isDarkMode={isDarkMode} />;
       case 'reports': return <SessionReports isDarkMode={isDarkMode} />;
-      case 'messages': return <Messages isDarkMode={isDarkMode} />;
+      case 'messages':
+        return (
+          <Messages 
+            isDarkMode={isDarkMode} 
+            initialMessages={messages}
+            initialLoading={messagesLoading}
+            initialChannel={channel}
+            initialManagerInfo={managerInfo}
+          />
+        );
       default: return <Calendar isDarkMode={isDarkMode} />;
     }
   };

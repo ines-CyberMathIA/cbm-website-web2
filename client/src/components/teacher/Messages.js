@@ -11,12 +11,18 @@ import { fr } from 'date-fns/locale';
 import { useSocket } from '../../hooks/useSocket';
 import { useNotification } from '../../contexts/NotificationContext';
 
-const Messages = ({ isDarkMode }) => {
+const Messages = ({ 
+  isDarkMode, 
+  initialMessages,
+  initialLoading,
+  initialChannel,
+  initialManagerInfo 
+}) => {
   const [newMessage, setNewMessage] = useState('');
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [messages, setMessages] = useState(initialMessages || []);
+  const [loading, setLoading] = useState(initialLoading);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [managerInfo, setManagerInfo] = useState(null);
+  const [managerInfo, setManagerInfo] = useState(initialManagerInfo);
   const [activeChannel, setActiveChannel] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [firstUnreadMessageId, setFirstUnreadMessageId] = useState(null);

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useTheme } from './contexts/ThemeContext';
+import { useAuth } from './contexts/AuthContext';
+import { useMessageSocket } from './hooks/useMessageSocket';
 import Login from './components/Login';
 import Register from './components/Register';
 import AdminLogin from './components/AdminLogin';
@@ -18,6 +20,8 @@ function AppContent() {
   const location = useLocation();
   const isDashboardPage = location.pathname.includes('/dashboard');
   const { darkMode } = useTheme();
+  const { user } = useAuth();
+  useMessageSocket();
 
   return (
     <div>

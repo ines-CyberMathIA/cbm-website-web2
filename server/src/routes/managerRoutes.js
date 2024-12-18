@@ -334,7 +334,7 @@ router.delete('/cancel-invitation/:teacherId', authMiddleware, async (req, res) 
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h1 style="color: #4F46E5;">Information importante</h1>
             <p>Bonjour ${pendingTeacher.firstName},</p>
-            <p>Nous vous informons que votre invitation �� rejoindre CyberMathIA a été annulée.</p>
+            <p>Nous vous informons que votre invitation à rejoindre CyberMathIA a été annulée.</p>
             <p>Le lien d'activation précédent n'est plus valide.</p>
             <p style="color: #666;">Si vous pensez qu'il s'agit d'une erreur, veuillez contacter votre manager.</p>
           </div>
@@ -392,12 +392,12 @@ router.delete('/cancel-invitation/:teacherId', authMiddleware, async (req, res) 
 router.get('/message-channels', authMiddleware, async (req, res) => {
   try {
     const channels = await MessageChannel.find({ manager: req.user.userId })
-      .populate('teacher', 'firstName lastName email speciality')
-      .sort({ updatedAt: -1 });
-
+      .populate('teacher', 'firstName lastName email');
+    
+    console.log('Canaux trouvés pour le manager:', channels);
     res.json(channels);
   } catch (error) {
-    console.error('Erreur lors de la récupération des canaux:', error);
+    console.error('Erreur récupération canaux:', error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });

@@ -9,21 +9,40 @@ let connectedUsers = new Map(); // userId -> socket
 
 export default function initializeMessageSocket(server) {
   const io = new Server(server, {
-    cors: corsConfig
+    cors: {
+      origin: process.env.CLIENT_URL || "http://localhost:3000",
+      methods: ["GET", "POST"],
+      credentials: true
+    },
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    transports: ['websocket'],
+    allowEIO3: true
   });
 
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token;
+      console.log('🔑 Token reçu:', token ? 'présent' : 'manquant');
+      
+      if (!token) {
+        throw new Error('Token manquant');
+      }
+
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       socket.user = decoded;
+      console.log('👤 Utilisateur authentifié:', decoded);
       next();
     } catch (error) {
-      next(new Error('Authentication error'));
+      console.error('❌ Erreur d\'authentification socket:', error);
+      next(new Error('Authentification échouée'));
     }
   });
 
-  io.on('connection', async (socket) => {
+  io.on('connection', (socket) => {
+    console.log('🔌 Nouvelle connexion socket:', socket.id);
+    console.log('👤 Utilisateur connecté:', socket.user);
+
     const userId = socket.user.userId;
     
     // Gérer la connexion d'un utilisateur
@@ -52,6 +71,17 @@ export default function initializeMessageSocket(server) {
 
       // Émettre la liste mise à jour
       io.emit('users_status', Array.from(connectedUsers.keys()));
+    });
+
+    // Log quand un utilisateur rejoint un canal
+    socket.on('join_channel', ({ channelId }) => {
+      console.log('➡️ Utilisateur rejoint le canal:', channelId);
+      socket.join(channelId);
+    });
+
+    // Log des déconnexions
+    socket.on('disconnect', (reason) => {
+      console.log('👋 Utilisateur déconnecté:', socket.id, 'Raison:', reason);
     });
 
     // ... reste du code pour la gestion des messages

@@ -1,5 +1,6 @@
 import express from 'express';
 import { createServer } from 'http';
+import { Server } from 'socket.io';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
@@ -17,28 +18,61 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
-const io = initializeMessageSocket(httpServer);
+
+// Configuration CORS
+app.use(cors({
+  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true
+}));
+
+// Configuration Socket.IO
+const io = new Server(httpServer, {
+  cors: {
+    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    methods: ['GET', 'POST'],
+    credentials: true
+  },
+  path: '/socket.io',
+  transports: ['websocket'],
+  pingTimeout: 60000,
+  pingInterval: 25000
+});
+
+// Middleware Socket.IO pour l'authentification
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth.token;
+    if (!token) {
+      throw new Error('Token manquant');
+    }
+    // Vérification du token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    socket.user = decoded;
+    next();
+  } catch (error) {
+    console.error('Erreur authentification socket:', error);
+    next(new Error('Authentification échouée'));
+  }
+});
+
+// Gestionnaire de connexion Socket.IO
+io.on('connection', (socket) => {
+  console.log('Nouvelle connexion socket:', socket.id);
+  
+  socket.on('join_channel', ({ channelId }) => {
+    console.log(`Socket ${socket.id} rejoint le canal ${channelId}`);
+    socket.join(channelId);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Socket déconnecté:', socket.id);
+  });
+});
 
 // Middleware pour parser le JSON
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Configuration CORS détaillée
-const corsOptions = {
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204
-};
-
-// Appliquer CORS globalement
-app.use(cors(corsOptions));
-
-// Activer pre-flight pour toutes les routes
-app.options('*', cors(corsOptions));
 
 // Routes
 app.use('/api/users', userRoutes);

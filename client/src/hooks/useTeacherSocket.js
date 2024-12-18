@@ -9,7 +9,7 @@ export const useTeacherSocket = () => {
 
   useEffect(() => {
     if (!socket || !isConnected || !user) {
-      console.log('⚠️ Socket ou utilisateur non prêt:', { socket, isConnected, user });
+      console.log('⚠️ Socket ou utilisateur non prêt:', { socket: !!socket, isConnected, user: !!user });
       return;
     }
 
@@ -23,7 +23,6 @@ export const useTeacherSocket = () => {
 
     // Gérer la déconnexion
     const handleDisconnect = () => {
-      console.log('🔴 Socket déconnecté, émission du statut hors ligne');
       socket.emit('user_status', {
         userId: user.userId,
         status: 'offline'
@@ -33,8 +32,6 @@ export const useTeacherSocket = () => {
     socket.on('disconnect', handleDisconnect);
 
     return () => {
-      console.log('🧹 Nettoyage du socket professeur');
-      handleDisconnect();
       socket.off('disconnect', handleDisconnect);
     };
   }, [socket, isConnected, user]);

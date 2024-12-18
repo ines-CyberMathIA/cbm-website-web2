@@ -378,96 +378,30 @@ const ManagerDashboard = () => {
 
   // Gestion des événements socket
   React.useEffect(() => {
-    if (!socket || !isConnected || !teachers.length) {
-      console.log('⚠️ État initial:', { socket, isConnected, teachersCount: teachers.length });
-      return;
-    }
+    if (!socket) return;
 
-    console.log('👂 Configuration des écouteurs');
-
-    // Rejoindre les canaux
-    teachers.forEach(teacher => {
-      const teacherId = teacher._id;
-      const channelId = teacher.channelId || '675de5ce4d954b25b7b2f283';
-      console.log('🔗 Rejoindre les canaux:', {
-        teacherId,
-        channelId,
-        teacherName: teacher.firstName
-      });
-      socket.emit('join_channel', { channelId: teacherId });
-      socket.emit('join_channel', { channelId });
-    });
-
-    // Handler pour les messages
-    const handleNewMessage = (data) => {
-      console.log('📩 Message reçu:', data);
-      
-      if (!data?.message) {
-        console.error('❌ Format invalide:', data);
-        return;
-      }
-
+    // Écouter les nouveaux messages
+    socket.on('new_message', (data) => {
       const { message, channelId } = data;
       
-      // Logs détaillés
-      console.log('📝 Détails du message:', {
-        content: message.content,
-        senderId: message.senderId,
-        channelId,
-        currentUser: user?.userId
-      });
-
-      // Ne pas notifier si c'est notre propre message
-      if (message.senderId !== user?.userId) {
-        const teacher = teachers.find(t => t._id === message.senderId);
-        const senderName = teacher ? `${teacher.firstName} ${teacher.lastName}` : 'Un professeur';
-        
-        const notificationData = {
-          title: `💬 Message de ${senderName}`,
-          message: message.content.length > 50 
-            ? `${message.content.substring(0, 50)}...` 
-            : message.content,
-          type: 'info'
-        };
-
-        console.log('📬 Envoi de la notification:', notificationData);
-        addNotification(notificationData);
-      } else {
-        console.log('❌ Message envoyé par nous-mêmes, pas de notification');
-      }
-    };
-
-    // Handler pour les changements de statut
-    const handleUserStatus = ({ userId, status }) => {
-      console.log('👤 Changement de statut utilisateur:', { userId, status });
-      
-      const teacher = teachers.find(t => t._id === userId);
-      if (teacher) {
-        const isOnline = status === 'online';
-        console.log(`${isOnline ? '🟢' : '🔴'} Statut de ${teacher.firstName}:`, status);
+      // Vérifier si le message n'est pas de l'utilisateur actuel
+      if (message.senderId !== user.userId) {
+        // Récupérer les infos de l'expéditeur
+        const senderName = message.sender?.firstName || 'Quelqu\'un';
         
         addNotification({
-          title: `${isOnline ? '🟢' : '🔴'} Statut professeur`,
-          message: `${teacher.firstName} ${teacher.lastName} est maintenant ${isOnline ? 'en ligne' : 'hors ligne'}`,
-          type: isOnline ? 'success' : 'info'
+          title: 'Nouveau message',
+          message: `${senderName} vous a envoyé un message : ${message.content.substring(0, 50)}${message.content.length > 50 ? '...' : ''}`,
+          type: 'info'
         });
       }
-    };
+    });
 
-    // Attacher les écouteurs
-    socket.on('new_message', handleNewMessage);
-    socket.on('user_status', handleUserStatus);
-
-    // Vérifier que les écouteurs sont bien attachés
-    const listeners = socket.listeners('new_message');
-    console.log('🎧 Nombre d\'écouteurs new_message:', listeners.length);
-    
+    // Nettoyer les écouteurs
     return () => {
-      console.log('🧹 Nettoyage des écouteurs');
-      socket.off('new_message', handleNewMessage);
-      socket.off('user_status', handleUserStatus);
+      socket.off('new_message');
     };
-  }, [socket, isConnected, teachers, user, addNotification]);
+  }, [socket, user.userId, addNotification]);
 
   // Vérification de l'authentification
   React.useEffect(() => {
